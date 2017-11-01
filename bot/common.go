@@ -1,4 +1,4 @@
-package main
+package bot
 
 import (
     "os"
@@ -15,7 +15,8 @@ var (
     MaxWorker               = 20        // os.Getenv("MAX_WORKERS")
     MaxQueue                = 5         // os.Getenv("MAX_QUEUE")
     MaxLength int64         = 20480
-    ConnectionConfiguration = "postgres://executor:totoTOTO89@641a3187-5896-49c9-af7d-d8bed8187f79.pdb.ovh.net:21684/executor"
+    ConnectionConfiguration = "postgres://teaas:teaasTEAAS89@ts61115-053.dbaas.ovh.net:35176/teaas"
+//    ConnectionConfiguration = "postgres://executor:totoTOTO89@641a3187-5896-49c9-af7d-d8bed8187f79.pdb.ovh.net:21684/executor"
 )
 
 // Dispatcher configuration object
