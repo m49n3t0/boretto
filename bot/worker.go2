@@ -1,86 +1,90 @@
 package bot
 
-import (
-	//	"bytes"
-	//	"encoding/json"
-	//	_ "github.com/lib/pq"
-	//	"gopkg.in/gorp.v2"
-	//	"io/ioutil"
-	//	"net/http"
-	//	"time"
-	"github.com/m49n3t0/boretto/models"
-	"log"
-	"strconv"
-)
+//import (
+//	"bytes"
+//	"encoding/json"
+//	_ "github.com/lib/pq"
+//	"gopkg.in/gorp.v2"
+//	"io/ioutil"
+//	"log"
+//	"net/http"
+//	"strconv"
+//	"time"
+//)
+//
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// the worker executes the task process
-type Worker struct {
-	function    string
-	workerPool  chan chan int64
-	taskChannel chan int64
-	robots      *map[int64]*models.Definition
-	endpoints   *map[int64]interface{}
-	quit        chan bool
-	//	Definition  *models.Definition
-	//	connector   *gorp.DbMap
-}
-
-// function to create a new worker
-func NewWorker(dispatcher *Dispatcher) Worker {
-	return Worker{
-		function:    dispatcher.function,
-		workerPool:  dispatcher.workerPool,
-		taskChannel: make(chan int64),
-		robots:      &dispatcher.robots,
-		endpoints:   &dispatcher.endpoints,
-		quit:        make(chan bool)}
-
-	//		quit:        make(chan bool),
-	//		Definition:  definition}
-}
-
-// Start method starts the run loop for the worker, listening for a quit channel in
-// case we need to stop it
-func (worker *Worker) Start() {
-	go func() {
-		for {
-			// register the current worker into the worker queue
-			worker.workerPool <- worker.taskChannel
-
-			// read from the channel
-			select {
-
-			case taskId := <-worker.taskChannel:
-
-				log.Printf("Entry to taskChannel with ID : " + strconv.Itoa(int(taskId)) + "\n")
-
-				// we have received a work request
-				if err := worker.DoAction(taskId); err != nil {
-					log.Printf("Error while working on task: %s", err.Error())
-				}
-
-				log.Println(".", "ENDJOB")
-
-			case <-worker.quit:
-
-				// we have received a signal to stop
-				return
-			}
-		}
-	}()
-}
-
-// stop signals the worker to stop listening for work requests.
-func (worker *Worker) Stop() {
-	go func() {
-		worker.quit <- true
-	}()
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
+//// ================================================= //
+//// ================================================= //
+//
+//// Worker represents the worker that executes the task
+//type Worker struct {
+//	WorkerPool  chan chan int64
+//	TaskChannel chan int64
+//	quit        chan bool
+//	Definition  Definition
+//	connector   *gorp.DbMap
+//	Function    string
+//}
+//
+//// Create a new worker
+//func NewWorker(function string, workerPool chan chan int64, definition Definition) Worker {
+//	return Worker{
+//		Function:    function,
+//		WorkerPool:  workerPool,
+//		TaskChannel: make(chan int64),
+//		quit:        make(chan bool),
+//		Definition:  definition}
+//}
+//
+//// Start method starts the run loop for the worker, listening for a quit channel in
+//// case we need to stop it
+//func (w Worker) Start() {
+//
+//	// retrieve a gorp dbmap
+//	w.connector = initDb()
+//	// XXX : defer d.connector.Db.Close()
+//
+//	go func() {
+//		for {
+//			// register the current worker into the worker queue.
+//			w.WorkerPool <- w.TaskChannel
+//
+//			// read from the channel
+//			select {
+//			case taskId := <-w.TaskChannel:
+//
+//				log.Printf("Entry to taskChannel with ID : " + strconv.Itoa(int(taskId)) + "\n")
+//
+//				// we have received a work request.
+//				if err := w.Action(taskId); err != nil {
+//					log.Printf("Error while working on task: %s", err.Error())
+//				}
+//
+//				log.Println(".")
+//				log.Println(".")
+//				log.Println("ENDJOB")
+//
+//			case <-w.quit:
+//
+//				// we have received a signal to stop
+//				return
+//			}
+//		}
+//	}()
+//}
+//
+//// Stop signals the worker to stop listening for work requests.
+//func (w Worker) Stop() {
+//	go func() {
+//		w.quit <- true
+//	}()
+//}
+//
+//// ================================================= //
+//// ================================================= //
+//
 //// Response http from each API response
 //type HttpResponse struct {
 //	Buffer   *JsonB
@@ -89,12 +93,6 @@ func (worker *Worker) Stop() {
 //	Comment  *string
 //}
 //
-
-func (worker *Worker) DoAction(id int64) error {
-
-	return nil
-}
-
 //func (w Worker) Action(id int64) error {
 //
 //	// read the task from the id
@@ -376,7 +374,8 @@ func (worker *Worker) DoAction(id int64) error {
 //	return nil
 //}
 //
-/////////////////////////////////////////////////////////////////////////////////
+//// ================================================= //
+//// ================================================= //
 //
 //type HttpOut struct {
 //	Name      string
