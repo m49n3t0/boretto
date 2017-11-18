@@ -1,49 +1,25 @@
 package main
 
 import (
-    "log"
-    "github.com/m49n3t0/teaas/bot"
+	"github.com/m49n3t0/teaas/bot"
+	"log"
 )
 
 // Main function
 func main() {
 
-    log.Println("Begin")
+	log.Println("Begin")
 
-    exec, err := bot.New(
-        "database/create",
-        false,
-    )
+    exec, err := bot.New()
 
     if err != nil {
-        log.Fatalln("Error while create the executor", err )
+        panic( err )
     }
 
-    err = exec.Run()
+    exec.Run()
 
-    if err != nil {
-        log.Fatalln("Error while run the executor", err )
-    }
-
-    log.Println("Done")
-
+	log.Println("Done")
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //package main
 //

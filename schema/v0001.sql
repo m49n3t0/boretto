@@ -1,64 +1,51 @@
-drop table if exists "task";
-drop table if exists "endpoint_http";
-drop table if exists "robot";
 
-create table "task" (
-    --"id" uuid PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
-    "id" bigserial primary key not null,
-    "version" bigint not null,
-    "context" character varying(255) not null,
-    "function" character varying(255) not null,
-    "step" character varying(255) not null,
-    "status" character varying(255) not null,
-    "retry" bigint not null default 8,
-    "arguments" jsonb not null default '{}',
-    "buffer" jsonb not null default '{}'
+--+Migrate Down
+
+DROP TABLE IF EXISTS "robot";
+
+DROP TABLE IF EXISTS "http_endpoint";
+DROP TABLE IF EXISTS "endpoint";
+
+DROP TABLE IF EXISTS "task";
+
+--+Migrate Up
+
+CREATE TABLE "task" (
+    "id" BIGSERIAL PRIMARY KEY NOT NULL,
+    "version" BIGINT NOT NULL,
+    "context" CHARACTER VARYING(255) NOT NULL,
+    "function" CHARACTER VARYING(255) NOT NULL,
+    "step" CHARACTER VARYING(255) NOT NULL,
+    "status" CHARACTER VARYING(255) NOT NULL,
+    "retry" BIGINT NOT NULL DEFAULT 8,
+    "arguments" JSONB NOT NULL DEFAULT '{}',
+    "buffer" JSONB NOT NULL DEFAULT '{}',
+    "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-create table "endpoint_http" (
-    "id" bigserial primary key not null,
-    "name" character varying(255) not null,
-    "method" character varying(255) not null,
-    "url" character varying(255) not null
+CREATE TABLE "endpoint" (
+    "id" BIGSERIAL PRIMARY KEY NOT NULL,
+    "type" CHARACTER VARYING(255) NOT NULL,
+    "name" CHARACTER VARYING(255) NOT NULL,
+    "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT "endpoint_unique_name" UNIQUE("name")
 );
 
-create table "robot" (
-    "id" bigserial primary key not null,
-    "function" character varying(255) not null,
-    "version" bigint not null,
-    "definition" jsonb not null default '{}'
+CREATE TABLE "http_endpoint" (
+    "method" CHARACTER VARYING(255) NOT NULL,
+    "url" CHARACTER VARYING(255) NOT NULL,
+    CONSTRAINT "endpoint_http_check" CHECK ("type"='HTTP')
+) INHERITS ("endpoint");
+
+CREATE TABLE "robot" (
+    "id" BIGSERIAL PRIMARY KEY NOT NULL,
+    "function" CHARACTER VARYING(255) NOT NULL,
+    "version" BIGINT NOT NULL,
+    "status" CHARACTER VARYING(255) NOT NULL,
+    "definition" JSONB NOT NULL DEFAULT '{}',
+    "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

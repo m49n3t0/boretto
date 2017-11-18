@@ -1,89 +1,118 @@
 package bot
 
 import (
-    "log"
-    "strconv"
-    "gopkg.in/gorp.v2"
-    _ "github.com/lib/pq"
+	"github.com/go-pg/pg"
+	"github.com/m49n3t0/boretto/models"
+	"log"
+	"strconv"
 )
+
+///////////////////////////////////////////////////////////////////////////////
 
 // Dispatcher object
 type Dispatcher struct {
-    Definition      Definition
-    Configuration   Configuration
-    WorkerPool      chan chan int64
-    IdQueue         chan int64
+	//    //	Function string
+	//    //	Version  int64
+	//
+	function string
 
-    connector       *gorp.DbMap
-    quit            chan bool
+	workerPool chan chan int64
+	queue      chan int64
+	db         *pg.DB
+	robots     map[int64]*models.Definition
+	endpoints  map[int64]interface{}
+	//
+	//    //	definition    models.Definition
+	//    //	endpoint_http map[int64]models.EndpointHttp
+	//    //	quit          chan bool
 }
 
-// Create a new dispatcher
-func NewDispatcher(configuration Configuration) *Dispatcher {
-    pool := make(chan chan int64, configuration.MaxWorkers)
-    queue := make(chan int64, configuration.MaxQueue)
-    return &Dispatcher{
-        Configuration: configuration,
-        WorkerPool: pool,
-        IdQueue: queue }
+// dispatcher create handler
+func New() (*Dispatcher, error) {
+	//    // get the
+	//    version, err := strconv.ParseInt(ENV_VERSION, 10, 64)
+	//    if err != nil {
+	//        return nil, err
+	//    }
+
+	worker_pool := make(chan chan int64, ENV_MAX_WORKER)
+	queue := make(chan int64, ENV_MAX_QUEUE)
+
+	dispatcher := &Dispatcher{
+		function: ENV_FUNCTION,
+		//		Function:   ENV_FUNCTION,
+		//		Version:    version,
+		workerPool: worker_pool,
+		queue:      queue,
+	}
+
+	return dispatcher, nil
 }
 
-// Launch the dispatcher process
-func (d *Dispatcher) Run() {
+// do the dispatching processes
+func (dispatcher *Dispatcher) Run() {
 
-    // retrieve a gorp dbmap
-    d.connector = initDb()
-    // XXX : defer d.connector.Db.Close()
+	// get database connection
+	err := dispatcher.dbConnect()
+	if err != nil {
+		panic(err)
+	}
 
-    // retrieve the steps for this function
-    d.readSteps()
+	// defer the disconnection
+	defer dispatcher.dbDisconnect()
 
-    // starting n number of workers
-    for i := 0; i < d.Configuration.MaxWorkers; i++ {
-        worker := NewWorker(d.Configuration.Function,d.WorkerPool,d.Definition)
-        worker.Start()
-    }
+	// get robot configuration
+	err = dispatcher.getConfiguration()
+	if err != nil {
+		panic(err)
+	}
 
-    // launch a first read on database data task
-    go d.readTaskIds()
+	//	// starting n number of workers
+	//	for i := 0; i < dispatcher.Configuration.MaxWorkers; i++ {
+	//		worker := NewWorker(dispatcher)
+	//		worker.Start()
+	//	}
+	//
+	//	// launch a first read on database data task
+	//	go dispatcher.readTaskIds()
+	//
+	//	// launch the listener for database events
+	//	go dispatcher.initializeListenerAndListen()
 
-    // launch the listener for database events
-    go d.initializeListenerAndListen()
-
-    // launch the dispatch
-    d.dispatch()
+	// launch the dispatch
+	dispatcher.launch()
 }
 
-// Dispatch each task to a free worker
-func (d *Dispatcher) dispatch() {
+// Launch task in free workers
+func (dispatcher *Dispatcher) launch() {
 
-    log.Println("Worker queue dispatcher started...")
-
-    for {
-        select {
-            case taskId := <-d.IdQueue:
-
-                log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa( int(taskId) ) )
-
-                // try to obtain a worker task channel that is available.
-                // this will block until a worker is idle
-                taskChannel := <-d.WorkerPool
-
-                // dispatch the task to the worker task channel
-                taskChannel <- taskId
-
-            case <-d.quit:
-                // we have received a signal to stop
-
-                // XXX : how to stop workers correctly
-        }
-    }
+	//	log.Println("Worker dispatch started...")
+	//
+	//	for {
+	//		select {
+	//		case taskId := <-dispatcher.queue:
+	//
+	//			log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa(int(taskId)))
+	//
+	//			// try to obtain a worker task channel that is available.
+	//			// this will block until a worker is idle
+	//			taskChannel := <-dispatcher.workerPool
+	//
+	//			// dispatch the task to the worker task channel
+	//			taskChannel <- taskId
+	//
+	//		case <-dispatcher.quit:
+	//			// we have received a signal to stop
+	//
+	//			// XXX : how to stop workers correctly
+	//		}
+	//	}
 }
 
 // XXX : how to improve this part ?
-// Stop signals the worker to stop listening for work requests.
-func (d *Dispatcher) Stop() {
-    go func() {
-        d.quit <- true
-    }()
+// Stop signals
+func (dispatcher *Dispatcher) Stop() {
+	//	go func() {
+	//		dispatcher.quit <- true
+	//	}()
 }
