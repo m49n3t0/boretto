@@ -4,7 +4,7 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/m49n3t0/boretto/models"
 	"log"
-	"strconv"
+	//	"strconv"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -14,13 +14,21 @@ type Dispatcher struct {
 	//    //	Function string
 	//    //	Version  int64
 	//
+
+	// function on what the robot work
 	function string
 
+	// manage the distribution of workflow
 	workerPool chan chan int64
 	queue      chan int64
-	db         *pg.DB
-	robots     map[int64]*models.Definition
-	endpoints  map[int64]interface{}
+
+	// store datas from database
+	robots    map[int64]*models.Definition
+	endpoints map[int64]interface{}
+
+	// database handler
+	db *pg.DB
+
 	//
 	//    //	definition    models.Definition
 	//    //	endpoint_http map[int64]models.EndpointHttp
@@ -35,15 +43,19 @@ func New() (*Dispatcher, error) {
 	//        return nil, err
 	//    }
 
-	worker_pool := make(chan chan int64, ENV_MAX_WORKER)
+	workerPool := make(chan chan int64, ENV_MAX_WORKER)
 	queue := make(chan int64, ENV_MAX_QUEUE)
+	robots := make(map[int64]*models.Definition)
+	endpoints := make(map[int64]interface{})
 
 	dispatcher := &Dispatcher{
 		function: ENV_FUNCTION,
 		//		Function:   ENV_FUNCTION,
 		//		Version:    version,
-		workerPool: worker_pool,
+		workerPool: workerPool,
 		queue:      queue,
+		robots:     robots,
+		endpoints:  endpoints,
 	}
 
 	return dispatcher, nil
@@ -85,6 +97,8 @@ func (dispatcher *Dispatcher) Run() {
 
 // Launch task in free workers
 func (dispatcher *Dispatcher) launch() {
+
+	log.Println("LAUNCHED")
 
 	//	log.Println("Worker dispatch started...")
 	//

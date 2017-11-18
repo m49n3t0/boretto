@@ -1,7 +1,7 @@
 package bot
 
 import (
-	"github.com/go-pg/pg"
+	//	"github.com/go-pg/pg"
 	"os"
 )
 

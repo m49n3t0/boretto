@@ -27,6 +27,7 @@ CREATE TABLE "task" (
 CREATE TABLE "endpoint" (
     "id" BIGSERIAL PRIMARY KEY NOT NULL,
     "type" CHARACTER VARYING(255) NOT NULL,
+    "version" BIGINT NOT NULL,
     "name" CHARACTER VARYING(255) NOT NULL,
     "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -48,4 +49,26 @@ CREATE TABLE "robot" (
     "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+
+insert into "http_endpoint" ( "type", "version", "name", "method", "url" ) values
+                            ( 'HTTP', '1', 'starting', 'GET', 'https://api.com/starting' ),
+                            ( 'HTTP', '1', 'checking', 'GET', 'https://api.com/checking' ),
+                            ( 'HTTP', '1', 'onServer', 'GET', 'https://api.com/onServer' ),
+                            ( 'HTTP', '1', 'onInterne', 'GET', 'https://api.com/onInterne' ),
+                            ( 'HTTP', '1', 'ending', 'GET', 'https://api.com/ending' );
+
+insert into "robot" ( "function", "version", "status", "definition" ) values
+                    ( 'database/create', '1', 'ACTIVE', '{"sequence":[{"name":"STARTING","endpoint_type":"HTTP","endpoint_id":1},{"name":"CHECKING","endpoint_type":"HTTP","endpoint_id":2},{"name":"ON_SERVER","endpoint_type":"HTTP","endpoint_id":3},{"name":"ON_INTERNE","endpoint_type":"HTTP","endpoint_id":4},{"name":"ENDING","endpoint_type":"HTTP","endpoint_id":5}]}' );
+
+
+
+
+
+
+
+
+
+
+
+
 

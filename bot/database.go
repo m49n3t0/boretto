@@ -2,6 +2,7 @@ package bot
 
 import (
 	"errors"
+	"github.com/go-pg/pg"
 	"github.com/m49n3t0/boretto/models"
 	"log"
 )
@@ -45,7 +46,7 @@ func (dispatcher *Dispatcher) dbConnect() error {
 func (dispatcher *Dispatcher) dbDisconnect() error {
 
 	// disconnect to the database
-	err = dispatcher.db.Close()
+	err := dispatcher.db.Close()
 	if err != nil {
 		log.Println("Problem while database disconnect")
 		return err
@@ -65,14 +66,18 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	// get the robot data
 	err := dispatcher.db.
 		Model(&robots).
-		Where(models.TblRobot_Function+" = ?", dispatcher.Function).
+		Where(models.TblRobot_Function+" = ?", dispatcher.function).
 		Where(models.TblRobot_Status+" = ?", "ACTIVE").
 		Select()
+
+	log.Println("1================")
 
 	if err != nil {
 		log.Println("Error while select robots")
 		return err
 	}
+
+	log.Println("2================")
 
 	// no elemtns, error
 	if len(robots) == 0 {
@@ -80,20 +85,31 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 		return errors.New("No robots definition found")
 	}
 
+	log.Println("3================")
+
 	// store the endpoint to fetch
 	var stepIDs = make(map[string][]int64)
+
+	log.Println("3.2================")
 
 	// save into dispatcher definitions data
 	for _, robot := range robots {
 
+		log.Println("3.3.1.............")
+		log.Printf("%+v", robot)
+
 		// remap by version the definitions
-		dispatcher.robots[robot.Version] = robot.Definition
+		dispatcher.robots[robot.Version] = &robot.Definition
+
+		log.Println("3.3.2.............")
 
 		// save the step IDs to fetch after
 		for _, step := range robot.Definition.Sequence {
 			stepIDs[step.EndpointType] = append(stepIDs[step.EndpointType], step.EndpointID)
 		}
 	}
+
+	log.Println("4================")
 
 	// fetch the steps data
 	for model, steps := range stepIDs {
@@ -107,7 +123,7 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 			// get the endpoint data
 			err := dispatcher.db.
 				Model(&endpoints).
-				Where(models.TblEndpointHttp_Id+" IN ( ? )", pg.In(steps)).
+				Where(models.TblHttpEndpoint_Id+" IN ( ? )", pg.In(steps)).
 				Select()
 
 			if err != nil {
@@ -123,6 +139,8 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 			}
 		}
 	}
+
+	log.Println("5================")
 
 	return nil
 }

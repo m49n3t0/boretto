@@ -6,6 +6,7 @@ type HttpEndpoint struct {
 
 	Id           int64  `sql:"id"`
 	Type         string `sql:"type,notnull"`
+	Version      int64  `sql:"version,notnull"`
 	Name         string `sql:"name,notnull"`
 	CreationDate string `sql:"creation_date,notnull"`
 	LastUpdate   string `sql:"last_update,notnull"`
@@ -14,11 +15,12 @@ type HttpEndpoint struct {
 }
 
 const (
-	TblHttpEndpoint_Id           = `"endpoint_http"."id"`
-	TblHttpEndpoint_Type         = `"endpoint_http"."type"`
-	TblHttpEndpoint_Name         = `"endpoint_http"."name"`
-	TblHttpEndpoint_CreationDate = `"endpoint_http"."creation_date"`
-	TblHttpEndpoint_LastUpdate   = `"endpoint_http"."last_update"`
-	TblHttpEndpoint_Method       = `"endpoint_http"."method"`
-	TblHttpEndpoint_Url          = `"endpoint_http"."url"`
+	TblHttpEndpoint_Id           = `"http_endpoint"."id"`
+	TblHttpEndpoint_Type         = `"http_endpoint"."type"`
+	TblHttpEndpoint_Version      = `"http_endpoint"."version"`
+	TblHttpEndpoint_Name         = `"http_endpoint"."name"`
+	TblHttpEndpoint_CreationDate = `"http_endpoint"."creation_date"`
+	TblHttpEndpoint_LastUpdate   = `"http_endpoint"."last_update"`
+	TblHttpEndpoint_Method       = `"http_endpoint"."method"`
+	TblHttpEndpoint_Url          = `"http_endpoint"."url"`
 )

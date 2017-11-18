@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/m49n3t0/teaas/bot"
+	"github.com/m49n3t0/boretto/bot"
 	"log"
 )
 
