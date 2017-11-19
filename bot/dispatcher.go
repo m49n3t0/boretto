@@ -1,25 +1,21 @@
 package bot
 
 import (
-	"github.com/go-pg/pg"
-	"github.com/m49n3t0/boretto/models"
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
-    "syscall"
-    "os"
-    "os/signal"
-	"time"
-)
+	"syscall"
 
+	"github.com/go-pg/pg"
+
+	"github.com/m49n3t0/boretto/models"
+)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-
-// Dispatcher object
+// dispatcher object
 type Dispatcher struct {
-	//    //	Function string
-	//    //	Version  int64
-	//
 
 	// function on what the robot work
 	function string
@@ -32,59 +28,45 @@ type Dispatcher struct {
 	workerPool chan chan int64
 	queue      chan int64
 
-    // manage the quit process
-    signal chan os.Signal
-	quit          chan bool
+	// manage the quit process
+	signal chan os.Signal
+	quit   chan bool
 
 	// database handler
 	db *pg.DB
-
-	//
-	//    //	definition    models.Definition
-	//    //	endpoint_http map[int64]models.EndpointHttp
-	//    //	quit          chan bool
 }
-
 
 // dispatcher create handler
 func New() (*Dispatcher, error) {
-	//    // get the
-	//    version, err := strconv.ParseInt(ENV_VERSION, 10, 64)
-	//    if err != nil {
-	//        return nil, err
-	//    }
 
 	robots := make(map[int64]*models.Definition)
 	endpoints := make(map[int64]interface{})
 	workerPool := make(chan chan int64, ENV_MAX_WORKER)
 	queue := make(chan int64, ENV_MAX_QUEUE)
-    signal := make(chan os.Signal, 2)
-    quit := make(chan bool)
+	signal := make(chan os.Signal, 2)
+	quit := make(chan bool)
 
 	dispatcher := &Dispatcher{
-		function: ENV_FUNCTION,
-		//		Function:   ENV_FUNCTION,
-		//		Version:    version,
+		function:   ENV_FUNCTION,
 		robots:     robots,
 		endpoints:  endpoints,
 		workerPool: workerPool,
 		queue:      queue,
-        signal: signal,
-        quit: quit,
+		signal:     signal,
+		quit:       quit,
 	}
 
 	return dispatcher, nil
 }
 
-
 // do the dispatching processes
 func (dispatcher *Dispatcher) Run() {
 
-    // link system signal to the dispatcher signal
-    signal.Notify(dispatcher.signal, os.Interrupt, syscall.SIGTERM)
+	// link system signal to the dispatcher signal
+	signal.Notify(dispatcher.signal, os.Interrupt, syscall.SIGTERM)
 
-    // listen the channel
-    go dispatcher.Signal()
+	// listen the channel
+	go dispatcher.Signal()
 
 	// get database connection
 	err := dispatcher.dbConnect()
@@ -113,7 +95,6 @@ func (dispatcher *Dispatcher) Run() {
 	// launch a first task ID listing
 	go dispatcher.getTaskIDs()
 
-
 	//	// launch the listener for database events
 	//	go dispatcher.initializeListenerAndListen()
 
@@ -121,8 +102,7 @@ func (dispatcher *Dispatcher) Run() {
 	dispatcher.launch()
 }
 
-
-// Launch task in free workers
+// launch task in free workers
 func (dispatcher *Dispatcher) launch() {
 
 	log.Println("LAUNCHED")
@@ -145,35 +125,28 @@ func (dispatcher *Dispatcher) launch() {
 		case <-dispatcher.quit:
 
 			// we have received a signal to stop
-            log.Println("RECEIVE QUIT")
+			log.Println("RECEIVE QUIT")
 
 			// XXX : how to stop workers correctly
 
-            os.Exit(1)
+			os.Exit(1)
 		}
 	}
 }
 
-
-// Stop signals programmatically
+// stop signals programmatically
 func (dispatcher *Dispatcher) Stop() {
 	go func() {
-        log.Println("STOP")
+		log.Println("STOP")
 		dispatcher.quit <- true
 	}()
 }
 
-
-// Stop signals from system
+// stop signals from system
 func (dispatcher *Dispatcher) Signal() {
 	go func() {
-        <-dispatcher.signal
-        log.Println("SIGNAL")
-        dispatcher.Stop()
+		<-dispatcher.signal
+		log.Println("SIGNAL")
+		dispatcher.Stop()
 	}()
 }
-
-
-
-
-

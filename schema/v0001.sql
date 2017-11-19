@@ -63,7 +63,7 @@ insert into "robot" ( "function", "version", "status", "definition" ) values
 
 
 insert into "task" ( "version", "context", "function", "step", "status", "retry" ) values
-                    ( '1', 'toto', 'database/create', 'starting', 'TODO', '8' );
+                    ( '1', 'toto', 'database/create', 'STARTING', 'TODO', '8' );
 
 
 

@@ -8,9 +8,7 @@ import (
 	"time"
 )
 
-
 ///////////////////////////////////////////////////////////////////////////////
-
 
 // retrieve a database connection
 func (dispatcher *Dispatcher) dbConnect() error {
@@ -40,7 +38,7 @@ func (dispatcher *Dispatcher) dbConnect() error {
 	}
 
 	// build the query logger
-	dispatcher.db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
+	db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
 		query, err := event.FormattedQuery()
 		if err != nil {
 			panic(err)
@@ -55,7 +53,6 @@ func (dispatcher *Dispatcher) dbConnect() error {
 	return nil
 }
 
-
 // close the database connection
 func (dispatcher *Dispatcher) dbDisconnect() error {
 
@@ -68,7 +65,6 @@ func (dispatcher *Dispatcher) dbDisconnect() error {
 
 	return nil
 }
-
 
 // retrieve robot configuration for this function from database
 func (dispatcher *Dispatcher) getConfiguration() error {
@@ -160,14 +156,13 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	return nil
 }
 
-
 // retrieve the available task ID list
 func (dispatcher *Dispatcher) getTaskIDs() error {
 
-    log.Println("Read all task IDs")
+	log.Println("Read all task IDs")
 
 	// where store the ID list
-    var IDs []int64
+	var IDs []int64
 
 	log.Println("9.0=========================")
 
@@ -181,8 +176,8 @@ func (dispatcher *Dispatcher) getTaskIDs() error {
 		OrderExpr(models.TblTask_Id+" ASC").
 		Where(models.TblTask_Status+" = ?", "TODO").
 		Where(models.TblTask_Function+" = ?", dispatcher.function).
-		Where(models.TblTask_Retry+" > ?", 0 ).
-		Where(models.TblTask_TodoDate+" <= NOW()").
+		Where(models.TblTask_Retry+" > ?", 0).
+		Where(models.TblTask_TodoDate + " <= NOW()").
 		Select(&IDs)
 
 	log.Println("9.1=========================")
@@ -195,17 +190,84 @@ func (dispatcher *Dispatcher) getTaskIDs() error {
 
 	log.Println("9.2=========================")
 
-    log.Println("All rows:")
+	log.Println("All rows:")
 
-    for x, id := range IDs {
+	for x, id := range IDs {
 
-        dispatcher.queue <- id
+		dispatcher.queue <- id
 
-        log.Printf("9.3=====>  %d : %+v\n", x, id)
-    }
+		log.Printf("9.3=====>  %d : %+v\n", x, id)
+	}
 
 	return nil
 }
+
+// retrieve a task by ID
+func (dispatcher *Dispatcher) getTask(id int64) (*models.Task, error) {
+
+    log.Println("Read task")
+
+	// model to fetch
+	var task models.Task
+
+	// fetch the object
+	err := dispatcher.db.
+		Model(&task).
+		Where(models.TblTask_Id+" = ?", id).
+		Where(models.TblTask_Status+" = ?", "TODO").
+		Where(models.TblTask_Function+" = ?", dispatcher.function).
+		Where(models.TblTask_Retry+" > ?", 0).
+		Where(models.TblTask_TodoDate + " <= NOW()").
+		First()
+
+	if err != nil {
+		if err == pg.ErrNoRows {
+			log.Println("Task not found")
+			return nil, errors.New("Task not found")
+		}
+
+		log.Println("Error while retrieve a task")
+		return nil, err
+	}
+
+    return &task, nil
+}
+
+// update a task data
+func (dispatcher *Dispatcher) updateTask(task *models.Task) error {
+
+    // last update key
+	task.LastUpdate = time.Now()
+
+	// fetch the object
+	err := dispatcher.db.Update(task)
+
+	if err != nil {
+		log.Println("Error while update the task")
+		return err
+	}
+
+    return nil
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //func (d *Dispatcher) initializeListenerAndListen() {
 //
@@ -292,105 +354,6 @@ func (dispatcher *Dispatcher) getTaskIDs() error {
 //
 //    return task, err
 //}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //import (
 //    "log"

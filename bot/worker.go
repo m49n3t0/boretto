@@ -8,47 +8,33 @@ import (
 	//	"io/ioutil"
 	//	"net/http"
 	//	"time"
-	//"github.com/m49n3t0/boretto/models"
+	"github.com/m49n3t0/boretto/models"
 	"log"
 	"strconv"
+	"errors"
 )
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
-
 // the worker executes the task process
 type Worker struct {
-//	function    string
 	workerPool  chan chan int64
 	taskChannel chan int64
-    dispatcher *Dispatcher
-//	robots      *map[int64]*models.Definition
-//	endpoints   *map[int64]interface{}
+	dispatcher  *Dispatcher
 	quit        chan bool
-	//	Definition  *models.Definition
-	//	connector   *gorp.DbMap
 }
-
 
 // function to create a new worker
 func NewWorker(dispatcher *Dispatcher) Worker {
 	return Worker{
-		//function:    dispatcher.function,
 		workerPool:  dispatcher.workerPool,
 		taskChannel: make(chan int64),
-        dispatcher: dispatcher,
-//		robots:      &dispatcher.robots,
-//		endpoints:   &dispatcher.endpoints,
+		dispatcher:  dispatcher,
 		quit:        make(chan bool)}
-
-	//		quit:        make(chan bool),
-	//		Definition:  definition}
 }
 
-
-// Start method starts the run loop for the worker, listening for a quit channel in
-// case we need to stop it
+// start method starts the run loop for the worker
+// listening for a quit channel in case we need to stop it
 func (worker *Worker) Start() {
 	go func() {
 		for {
@@ -78,7 +64,6 @@ func (worker *Worker) Start() {
 	}()
 }
 
-
 // stop signals the worker to stop listening for work requests.
 func (worker *Worker) Stop() {
 	go func() {
@@ -86,9 +71,7 @@ func (worker *Worker) Stop() {
 	}()
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
-
 
 //// Response http from each API response
 //type HttpResponse struct {
@@ -98,36 +81,98 @@ func (worker *Worker) Stop() {
 //	Comment  *string
 //}
 
-
 func (worker *Worker) DoAction(id int64) error {
 
-//	// read the task from the id
-//	task, err := worker.readOneTask(id)
-//
-//	if err != nil {
-//		log.Fatalln("Error while fetching one task", err)
-//	}
-//
-//	// logger
-//	log.Println("Working on task " + strconv.Itoa(int(task.ID)) + "/" + task.Function + " on step: " + task.Step)
-//
-//	// change the task data
-//	var timeNow = time.Now()
-//
-//	task.LastUpdate = &timeNow
-//	task.Status = "doing"
-//
-//	// update in database the task
-//	res, err := worker.connector.Update(&task)
-//
-//	if err != nil {
-//		log.Fatalln("Error while updating the task for status lock : ", err)
-//	}
-//
-//	if res != 1 {
-//		log.Fatalln("Error while updating the task status")
-//	}
-//
+	// retrieve a task
+	task, err := worker.dispatcher.getTask( id )
+
+	if err != nil {
+		log.Fatalln("Error while fetching one task", err)
+	}
+
+	// logger
+	log.Println("Working on task " + strconv.Itoa(int(task.Id)) + "|" + task.Function + " on step: " + task.Step)
+
+	// --------------------------------------------------------------------- //
+
+	log.Println("42.0.1----------------------------------------------")
+
+	// get robot for this task version
+	robot, ok := worker.dispatcher.robots[ task.Version ]
+
+	if !ok {
+		log.Println("Robot definition for this version doesn't exists")
+		return errors.New("Robot not found")
+	}
+
+	log.Println("42.0.2----------------------------------------------")
+
+	log.Println( robot.Sequence )
+
+	log.Println("42.0.3----------------------------------------------")
+
+	// vars on step
+	var step *models.Step
+
+	// get the actual step in the sequence
+	for _, s := range robot.Sequence {
+
+        log.Println("42.0.4----------------------------------------------")
+        log.Printf("task step : %s / step name : %s , %s , %s", task.Step, s.Name, s.EndpointType, s.EndpointID)
+
+		// check with the local task
+		if task.Step == s.Name {
+            log.Println("42.0.5----FOUND")
+			step = &s
+			break
+		}
+	}
+
+	log.Println("42.1.1----------------------------------------------")
+
+	log.Println( step )
+
+	log.Println("42.1.2----------------------------------------------")
+
+	// check step found
+	if step == nil {
+		log.Println("Step not found for this version")
+		return errors.New("Step not found")
+	}
+
+	log.Println("42.2----------------------------------------------")
+
+	// get the associated endpoint
+	endpoint, ok := worker.dispatcher.endpoints[ step.EndpointID ]
+
+	if !ok {
+		log.Println("Associated endpoint to this step doesn't exists")
+		return errors.New("Endpoint not found")
+	}
+
+	log.Println("42.3----------------------------------------------")
+
+	// --------------------------------------------------------------------- //
+
+	// change the task data
+	task.Status = "DOING"
+
+	// update in database the task
+	err = worker.dispatcher.updateTask( task )
+
+	if err != nil {
+		log.Println("Error while updating the task for status lock : ", err)
+		return err
+	}
+
+	log.Println("42.4----------------------------------------------")
+
+	// --------------------------------------------------------------------- //
+
+
+	log.Println(endpoint)
+
+
 //	// vars on step data
 //	var actualStep Step
 //	var foundActualStep = false
@@ -358,40 +403,74 @@ func (worker *Worker) DoAction(id int64) error {
 //		}
 //	}
 //
-//	log.Println("Task updation")
 //
-//	// update the database
-//	num, err := worker.connector.Update(&task)
 //
-//	if err != nil {
-//		log.Fatalln("Error while update on the database the task", err)
-//	}
 //
-//	if num > 1 {
-//		log.Fatalln("Error while updating the task, more than one row modified")
-//	}
-//
-//	if num < 1 {
-//		log.Fatalln("Error while updating the task, no row modified")
-//	}
-//
-//	log.Println("Task updated")
+
+
+
+	// --------------------------------------------------------------------- //
+
+	log.Println("42.9----------------------------------------------")
+
+	log.Println("Task updation")
+
+	// update in database the task
+	err = worker.dispatcher.updateTask( task )
+
+	if err != nil {
+		log.Println("Error while updating the task result : ", err)
+		return err
+	}
+
+	log.Println("42.10----------------------------------------------")
+
+	log.Println("Task updated")
 
 	return nil
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
-
-
-
-
 
 //type HttpOut struct {
 //	Name      string
