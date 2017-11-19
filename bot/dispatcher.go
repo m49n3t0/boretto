@@ -95,8 +95,8 @@ func (dispatcher *Dispatcher) Run() {
 	// launch a first task ID listing
 	go dispatcher.getTaskIDs()
 
-	//	// launch the listener for database events
-	//	go dispatcher.initializeListenerAndListen()
+    // launch the database NOTIFY listener
+    go dispatcher.listen()
 
 	// launch the dispatch
 	dispatcher.launch()

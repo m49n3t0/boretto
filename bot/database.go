@@ -6,6 +6,7 @@ import (
 	"github.com/m49n3t0/boretto/models"
 	"log"
 	"time"
+    "encoding/json"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -250,241 +251,72 @@ func (dispatcher *Dispatcher) updateTask(task *models.Task) error {
     return nil
 }
 
+// listen the database event channel to do some actions
+func (dispatcher *Dispatcher) listen() error {
 
+    // build the event chan to listen
+    var eventChan = "event_task"
+    //listener := dispatcher.db.Listen("event_task_" + dispatcher.function)
 
+    // get the database listener for this robot
+    listener := dispatcher.db.Listen( eventChan )
+    //listener := dispatcher.db.Listen("event_task_" + dispatcher.function)
 
+//    defer ln.Close()
 
+    // get the channel
+    channel := listener.Channel()
 
+    // while true
+    for {
+        select {
+            // receive a database event
+            case event := <-channel:
 
+                log.Println("654.0-event-received------------------------------")
+                log.Println( event )
 
+                // model of the event data
+                var notification models.Notification
 
+                // decode event json data
+                err := json.Unmarshal([]byte( event.Payload ), &notification)
 
+                if err != nil {
+                    log.Println("Error while decode the database notification", err)
+                    continue
+                }
 
+                // restart event process
+                if notification.Action == "RESTART" {
 
+                    log.Println("Received event for restart the robot")
 
+                    // XXX: need to develop this part of restart data
 
+                    continue
+                }
 
+                // task event process
+                if notification.Action == "TASK" && notification.Data.TaskID != 0 {
 
+                    log.Printf("Received event for task ID : %d", notification.Data.TaskID)
 
+                    // push task ID event to the channel
+                    dispatcher.queue <- notification.Data.TaskID
 
+                    continue
+                }
 
+            // recursive auto-pull
+            case <-time.After( 90 * time.Second ):
 
-//func (d *Dispatcher) initializeListenerAndListen() {
-//
-//    _, err := sql.Open("postgres", ConnectionConfiguration)
-//
-//    if err != nil {
-//        panic(err)
-//    }
-//
-//    reportProblem := func(ev pq.ListenerEventType, err error) {
-//        if err != nil {
-//            log.Println(err.Error())
-//        }
-//    }
-//
-//    listener := pq.NewListener(ConnectionConfiguration, 10*time.Second, time.Minute, reportProblem)
-//
-//    err = listener.Listen("events_task_" + d.Configuration.Function)
-//
-//    if err != nil {
-//        panic(err)
-//    }
-//
-//    log.Println("Start monitoring PostgreSQL...")
-//
-//    for {
-//        d.waitForNotification(listener)
-//    }
-//}
-//
-//type DatabaseNotification struct {
-//    Table       string
-//    Action      string
-//    Function    string
-//    ID          int64
-//}
-//
-//func (d *Dispatcher) waitForNotification(l *pq.Listener) {
-//    for {
-//        select {
-//            case n := <-l.Notify:
-//
-//                var notification DatabaseNotification
-//
-//                err := json.Unmarshal([]byte(n.Extra), &notification)
-//
-//                if err != nil {
-//                    log.Println("error:",err)
-//                }
-//
-//                log.Println("Received data from channel [", n.Channel, "] :")
-//
-//                log.Printf("%+v \n", notification)
-//
-//                d.IdQueue <- notification.ID
-//
-//                log.Println("Data send in task queue")
-//
-//            case <-time.After(90 * time.Second):
-//
-//                log.Println("Received no events for 90 seconds, checking connection")
-//
-//                go l.Ping()
-//
-//                log.Println("Retreieve ids")
-//
-//                go d.readTaskIds()
-//        }
-//    }
-//}
-//
-//func (w *Worker) readOneTask(id int64) (task Task, err error) {
-//
-//    log.Println("Read one task")
-//
-//    err = w.connector.SelectOne(
-//        &task,
-//        "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() limit 1",
-//        map[string]interface{}{"status":"todo","function":w.Function,"id":id} )
-//
-//    if err != nil {
-//        log.Fatalln("Select failed", err)
-//    }
-//
-//    return task, err
-//}
+                // logger
+                log.Println("Auto-pull")
 
-//import (
-//    "log"
-//    "time"
-//    "encoding/json"
-//    "database/sql"
-//    "github.com/lib/pq"
-//)
-//
-//func (d *Dispatcher) readSteps() {
-//
-//    log.Println("Get the dispatcher definition")
-//
-//    err := d.connector.SelectOne(
-//        &d.Definition,
-//        "select * from definition where function = :function",
-//        map[string]interface{}{"function":d.Configuration.Function} )
-//
-//    if err != nil {
-//        log.Fatalln("Select failed", err)
-//    }
-//}
-//
-//func (d *Dispatcher) readTaskIds() {
-//
-//    log.Println("Read all task IDs")
-//
-//    var taskIds []int64
-//
-//    _, err := d.connector.Select(
-//        &taskIds,
-//        "select id from task where status = :status and function = :function and retry > 0 and todo_date <= now() order by id asc",
-//        map[string]interface{}{"status":"todo","function":d.Configuration.Function} )
-//
-//    if err != nil {
-//        log.Fatalln("Select failed", err)
-//    }
-//
-//    log.Println("All rows:")
-//
-//    for x, id := range taskIds {
-//
-//        d.IdQueue <- id
-//
-//        log.Printf("  %d : %v\n", x, id)
-//    }
-//}
-//
-//func (d *Dispatcher) initializeListenerAndListen() {
-//
-//    _, err := sql.Open("postgres", ConnectionConfiguration)
-//
-//    if err != nil {
-//        panic(err)
-//    }
-//
-//    reportProblem := func(ev pq.ListenerEventType, err error) {
-//        if err != nil {
-//            log.Println(err.Error())
-//        }
-//    }
-//
-//    listener := pq.NewListener(ConnectionConfiguration, 10*time.Second, time.Minute, reportProblem)
-//
-//    err = listener.Listen("events_task_" + d.Configuration.Function)
-//
-//    if err != nil {
-//        panic(err)
-//    }
-//
-//    log.Println("Start monitoring PostgreSQL...")
-//
-//    for {
-//        d.waitForNotification(listener)
-//    }
-//}
-//
-//type DatabaseNotification struct {
-//    Table       string
-//    Action      string
-//    Function    string
-//    ID          int64
-//}
-//
-//func (d *Dispatcher) waitForNotification(l *pq.Listener) {
-//    for {
-//        select {
-//            case n := <-l.Notify:
-//
-//                var notification DatabaseNotification
-//
-//                err := json.Unmarshal([]byte(n.Extra), &notification)
-//
-//                if err != nil {
-//                    log.Println("error:",err)
-//                }
-//
-//                log.Println("Received data from channel [", n.Channel, "] :")
-//
-//                log.Printf("%+v \n", notification)
-//
-//                d.IdQueue <- notification.ID
-//
-//                log.Println("Data send in task queue")
-//
-//            case <-time.After(90 * time.Second):
-//
-//                log.Println("Received no events for 90 seconds, checking connection")
-//
-//                go l.Ping()
-//
-//                log.Println("Retreieve ids")
-//
-//                go d.readTaskIds()
-//        }
-//    }
-//}
-//
-//func (w *Worker) readOneTask(id int64) (task Task, err error) {
-//
-//    log.Println("Read one task")
-//
-//    err = w.connector.SelectOne(
-//        &task,
-//        "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() limit 1",
-//        map[string]interface{}{"status":"todo","function":w.Function,"id":id} )
-//
-//    if err != nil {
-//        log.Fatalln("Select failed", err)
-//    }
-//
-//    return task, err
-//}
-//
+                // task pull
+                go dispatcher.getTaskIDs()
+        }
+    }
+}
+
