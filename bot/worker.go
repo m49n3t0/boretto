@@ -1,10 +1,10 @@
 package bot
 
 import (
+	"errors"
 	"github.com/m49n3t0/boretto/models"
 	"log"
 	"strconv"
-	"errors"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -37,21 +37,22 @@ func (worker *Worker) Start() {
 			// read from the channel
 			select {
 
-                case taskId := <-worker.taskChannel:
+			case taskId := <-worker.taskChannel:
 
-                    log.Printf("Entry to taskChannel with ID : " + strconv.Itoa(int(taskId)) + "\n")
+				log.Printf("Entry to taskChannel with ID : " + strconv.Itoa(int(taskId)) + "\n")
 
-                    // we have received a work request
-                    if err := worker.DoAction(taskId); err != nil {
-                        log.Printf("Error while working on task: %s", err.Error())
-                    }
+				// we have received a work request
+				if err := worker.DoAction(taskId); err != nil {
+					log.Printf("Error while working on task: %s", err.Error())
+				}
 
-                    log.Println(".", "ENDJOB")
+				log.Println(".", "ENDJOB")
 
-                case <-worker.quit:
+			case <-worker.quit:
 
-                    // we have received a signal to stop
-                    return
+				// we have received a signal to stop
+				// exit this function
+				return
 			}
 		}
 	}()
@@ -66,18 +67,11 @@ func (worker *Worker) Stop() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-//// Response http from each API response
-//type HttpResponse struct {
-//	Buffer   *JsonB
-//	Interval *int
-//	Step     *string
-//	Comment  *string
-//}
-
+// do the action for this task with the good action
 func (worker *Worker) DoAction(id int64) error {
 
 	// retrieve a task
-	task, err := worker.dispatcher.getTask( id )
+	task, err := worker.dispatcher.getTask(id)
 
 	if err != nil {
 		log.Fatalln("Error while fetching one task", err)
@@ -91,7 +85,7 @@ func (worker *Worker) DoAction(id int64) error {
 	log.Println("42.0.1----------------------------------------------")
 
 	// get robot for this task version
-	robot, ok := worker.dispatcher.robots[ task.Version ]
+	robot, ok := worker.dispatcher.robots[task.Version]
 
 	if !ok {
 		log.Println("Robot definition for this version doesn't exists")
@@ -100,7 +94,7 @@ func (worker *Worker) DoAction(id int64) error {
 
 	log.Println("42.0.2----------------------------------------------")
 
-	log.Println( robot.Sequence )
+	log.Println(robot.Sequence)
 
 	log.Println("42.0.3----------------------------------------------")
 
@@ -110,12 +104,12 @@ func (worker *Worker) DoAction(id int64) error {
 	// get the actual step in the sequence
 	for _, s := range robot.Sequence {
 
-        log.Println("42.0.4----------------------------------------------")
-        log.Printf("task step : %s / step name : %s , %s , %s", task.Step, s.Name, s.EndpointType, s.EndpointID)
+		log.Println("42.0.4----------------------------------------------")
+		log.Printf("task step : %s / step name : %s , %s , %s", task.Step, s.Name, s.EndpointType, s.EndpointID)
 
 		// check with the local task
 		if task.Step == s.Name {
-            log.Println("42.0.5----FOUND")
+			log.Println("42.0.5----FOUND")
 			step = &s
 			break
 		}
@@ -123,7 +117,7 @@ func (worker *Worker) DoAction(id int64) error {
 
 	log.Println("42.1.1----------------------------------------------")
 
-	log.Println( step )
+	log.Println(step)
 
 	log.Println("42.1.2----------------------------------------------")
 
@@ -136,7 +130,7 @@ func (worker *Worker) DoAction(id int64) error {
 	log.Println("42.2----------------------------------------------")
 
 	// get the associated endpoint
-	endpoint, ok := worker.dispatcher.endpoints[ step.EndpointID ]
+	endpoint, ok := worker.dispatcher.endpoints[step.EndpointID]
 
 	if !ok {
 		log.Println("Associated endpoint to this step doesn't exists")
@@ -151,7 +145,7 @@ func (worker *Worker) DoAction(id int64) error {
 	task.Status = "DOING"
 
 	// update in database the task
-	err = worker.dispatcher.updateTask( task )
+	err = worker.dispatcher.updateTask(task)
 
 	if err != nil {
 		log.Println("Error while updating the task for status lock : ", err)
@@ -162,12 +156,7 @@ func (worker *Worker) DoAction(id int64) error {
 
 	// --------------------------------------------------------------------- //
 
-
 	log.Println(endpoint)
-
-
-
-
 
 	// --------------------------------------------------------------------- //
 
@@ -176,7 +165,7 @@ func (worker *Worker) DoAction(id int64) error {
 	log.Println("Task updation")
 
 	// update in database the task
-	err = worker.dispatcher.updateTask( task )
+	err = worker.dispatcher.updateTask(task)
 
 	if err != nil {
 		log.Println("Error while updating the task result : ", err)
@@ -189,6 +178,3 @@ func (worker *Worker) DoAction(id int64) error {
 
 	return nil
 }
-
-
-

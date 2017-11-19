@@ -22,4 +22,3 @@ var (
 	ENV_MAX_WORKER = 20
 	ENV_MAX_QUEUE  = 5
 )
-

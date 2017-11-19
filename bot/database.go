@@ -1,12 +1,12 @@
 package bot
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/go-pg/pg"
 	"github.com/m49n3t0/boretto/models"
 	"log"
 	"time"
-    "encoding/json"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -206,7 +206,7 @@ func (dispatcher *Dispatcher) getTaskIDs() error {
 // retrieve a task by ID
 func (dispatcher *Dispatcher) getTask(id int64) (*models.Task, error) {
 
-    log.Println("Read task")
+	log.Println("Read task")
 
 	// model to fetch
 	var task models.Task
@@ -231,13 +231,13 @@ func (dispatcher *Dispatcher) getTask(id int64) (*models.Task, error) {
 		return nil, err
 	}
 
-    return &task, nil
+	return &task, nil
 }
 
 // update a task data
 func (dispatcher *Dispatcher) updateTask(task *models.Task) error {
 
-    // last update key
+	// last update key
 	task.LastUpdate = time.Now()
 
 	// fetch the object
@@ -248,75 +248,74 @@ func (dispatcher *Dispatcher) updateTask(task *models.Task) error {
 		return err
 	}
 
-    return nil
+	return nil
 }
 
 // listen the database event channel to do some actions
 func (dispatcher *Dispatcher) listen() error {
 
-    // build the event chan to listen
-    var eventChan = "event_task"
-    //listener := dispatcher.db.Listen("event_task_" + dispatcher.function)
+	// build the event chan to listen
+	var eventChan = "event_task"
+	//listener := dispatcher.db.Listen("event_task_" + dispatcher.function)
 
-    // get the database listener for this robot
-    listener := dispatcher.db.Listen( eventChan )
-    //listener := dispatcher.db.Listen("event_task_" + dispatcher.function)
+	// get the database listener for this robot
+	listener := dispatcher.db.Listen(eventChan)
+	//listener := dispatcher.db.Listen("event_task_" + dispatcher.function)
 
-//    defer ln.Close()
+	//    defer ln.Close()
 
-    // get the channel
-    channel := listener.Channel()
+	// get the channel
+	channel := listener.Channel()
 
-    // while true
-    for {
-        select {
-            // receive a database event
-            case event := <-channel:
+	// while true
+	for {
+		select {
+		// receive a database event
+		case event := <-channel:
 
-                log.Println("654.0-event-received------------------------------")
-                log.Println( event )
+			log.Println("654.0-event-received------------------------------")
+			log.Println(event)
 
-                // model of the event data
-                var notification models.Notification
+			// model of the event data
+			var notification models.Notification
 
-                // decode event json data
-                err := json.Unmarshal([]byte( event.Payload ), &notification)
+			// decode event json data
+			err := json.Unmarshal([]byte(event.Payload), &notification)
 
-                if err != nil {
-                    log.Println("Error while decode the database notification", err)
-                    continue
-                }
+			if err != nil {
+				log.Println("Error while decode the database notification", err)
+				continue
+			}
 
-                // restart event process
-                if notification.Action == "RESTART" {
+			// restart event process
+			if notification.Action == "RESTART" {
 
-                    log.Println("Received event for restart the robot")
+				log.Println("Received event for restart the robot")
 
-                    // XXX: need to develop this part of restart data
+				// XXX: need to develop this part of restart data
 
-                    continue
-                }
+				continue
+			}
 
-                // task event process
-                if notification.Action == "TASK" && notification.Data.TaskID != 0 {
+			// task event process
+			if notification.Action == "TASK" && notification.Data.TaskID != 0 {
 
-                    log.Printf("Received event for task ID : %d", notification.Data.TaskID)
+				log.Printf("Received event for task ID : %d", notification.Data.TaskID)
 
-                    // push task ID event to the channel
-                    dispatcher.queue <- notification.Data.TaskID
+				// push task ID event to the channel
+				dispatcher.queue <- notification.Data.TaskID
 
-                    continue
-                }
+				continue
+			}
 
-            // recursive auto-pull
-            case <-time.After( 90 * time.Second ):
+		// recursive auto-pull
+		case <-time.After(90 * time.Second):
 
-                // logger
-                log.Println("Auto-pull")
+			// logger
+			log.Println("Auto-pull")
 
-                // task pull
-                go dispatcher.getTaskIDs()
-        }
-    }
+			// task pull
+			go dispatcher.getTaskIDs()
+		}
+	}
 }
-
