@@ -5,9 +5,12 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/m49n3t0/boretto/models"
 	"log"
+	"time"
 )
 
+
 ///////////////////////////////////////////////////////////////////////////////
+
 
 // retrieve a database connection
 func (dispatcher *Dispatcher) dbConnect() error {
@@ -36,11 +39,22 @@ func (dispatcher *Dispatcher) dbConnect() error {
 		return err
 	}
 
+	// build the query logger
+	dispatcher.db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
+		query, err := event.FormattedQuery()
+		if err != nil {
+			panic(err)
+		}
+
+		log.Printf("%s %s", time.Since(event.StartTime), query)
+	})
+
 	// reference it into dispatcher
 	dispatcher.db = db
 
 	return nil
 }
+
 
 // close the database connection
 func (dispatcher *Dispatcher) dbDisconnect() error {
@@ -54,6 +68,7 @@ func (dispatcher *Dispatcher) dbDisconnect() error {
 
 	return nil
 }
+
 
 // retrieve robot configuration for this function from database
 func (dispatcher *Dispatcher) getConfiguration() error {
@@ -144,6 +159,238 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 
 	return nil
 }
+
+
+// retrieve the available task ID list
+func (dispatcher *Dispatcher) getTaskIDs() error {
+
+    log.Println("Read all task IDs")
+
+	// where store the ID list
+    var IDs []int64
+
+	log.Println("9.0=========================")
+
+	// working on this model
+	var task models.Task
+
+	// fetch the available ID list
+	err := dispatcher.db.
+		Model(&task).
+		Column("id").
+		OrderExpr(models.TblTask_Id+" ASC").
+		Where(models.TblTask_Status+" = ?", "TODO").
+		Where(models.TblTask_Function+" = ?", dispatcher.function).
+		Where(models.TblTask_Retry+" > ?", 0 ).
+		Where(models.TblTask_TodoDate+" <= NOW()").
+		Select(&IDs)
+
+	log.Println("9.1=========================")
+
+	if err != nil {
+		log.Println("Error while fetching the task ids")
+		log.Println(err)
+		return err
+	}
+
+	log.Println("9.2=========================")
+
+    log.Println("All rows:")
+
+    for x, id := range IDs {
+
+        dispatcher.queue <- id
+
+        log.Printf("9.3=====>  %d : %+v\n", x, id)
+    }
+
+	return nil
+}
+
+//func (d *Dispatcher) initializeListenerAndListen() {
+//
+//    _, err := sql.Open("postgres", ConnectionConfiguration)
+//
+//    if err != nil {
+//        panic(err)
+//    }
+//
+//    reportProblem := func(ev pq.ListenerEventType, err error) {
+//        if err != nil {
+//            log.Println(err.Error())
+//        }
+//    }
+//
+//    listener := pq.NewListener(ConnectionConfiguration, 10*time.Second, time.Minute, reportProblem)
+//
+//    err = listener.Listen("events_task_" + d.Configuration.Function)
+//
+//    if err != nil {
+//        panic(err)
+//    }
+//
+//    log.Println("Start monitoring PostgreSQL...")
+//
+//    for {
+//        d.waitForNotification(listener)
+//    }
+//}
+//
+//type DatabaseNotification struct {
+//    Table       string
+//    Action      string
+//    Function    string
+//    ID          int64
+//}
+//
+//func (d *Dispatcher) waitForNotification(l *pq.Listener) {
+//    for {
+//        select {
+//            case n := <-l.Notify:
+//
+//                var notification DatabaseNotification
+//
+//                err := json.Unmarshal([]byte(n.Extra), &notification)
+//
+//                if err != nil {
+//                    log.Println("error:",err)
+//                }
+//
+//                log.Println("Received data from channel [", n.Channel, "] :")
+//
+//                log.Printf("%+v \n", notification)
+//
+//                d.IdQueue <- notification.ID
+//
+//                log.Println("Data send in task queue")
+//
+//            case <-time.After(90 * time.Second):
+//
+//                log.Println("Received no events for 90 seconds, checking connection")
+//
+//                go l.Ping()
+//
+//                log.Println("Retreieve ids")
+//
+//                go d.readTaskIds()
+//        }
+//    }
+//}
+//
+//func (w *Worker) readOneTask(id int64) (task Task, err error) {
+//
+//    log.Println("Read one task")
+//
+//    err = w.connector.SelectOne(
+//        &task,
+//        "select * from task where status = :status and function = :function and id = :id and retry > 0 and todo_date <= now() limit 1",
+//        map[string]interface{}{"status":"todo","function":w.Function,"id":id} )
+//
+//    if err != nil {
+//        log.Fatalln("Select failed", err)
+//    }
+//
+//    return task, err
+//}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //import (
 //    "log"

@@ -8,9 +8,12 @@ import (
     "syscall"
     "os"
     "os/signal"
+	"time"
 )
 
+
 ///////////////////////////////////////////////////////////////////////////////
+
 
 // Dispatcher object
 type Dispatcher struct {
@@ -42,6 +45,7 @@ type Dispatcher struct {
 	//    //	quit          chan bool
 }
 
+
 // dispatcher create handler
 func New() (*Dispatcher, error) {
 	//    // get the
@@ -71,6 +75,7 @@ func New() (*Dispatcher, error) {
 
 	return dispatcher, nil
 }
+
 
 // do the dispatching processes
 func (dispatcher *Dispatcher) Run() {
@@ -105,15 +110,17 @@ func (dispatcher *Dispatcher) Run() {
 		worker.Start()
 	}
 
-	//	// launch a first read on database data task
-	//	go dispatcher.readTaskIds()
-	//
+	// launch a first task ID listing
+	go dispatcher.getTaskIDs()
+
+
 	//	// launch the listener for database events
 	//	go dispatcher.initializeListenerAndListen()
 
 	// launch the dispatch
 	dispatcher.launch()
 }
+
 
 // Launch task in free workers
 func (dispatcher *Dispatcher) launch() {
@@ -148,7 +155,6 @@ func (dispatcher *Dispatcher) launch() {
 }
 
 
-
 // Stop signals programmatically
 func (dispatcher *Dispatcher) Stop() {
 	go func() {
@@ -156,6 +162,7 @@ func (dispatcher *Dispatcher) Stop() {
 		dispatcher.quit <- true
 	}()
 }
+
 
 // Stop signals from system
 func (dispatcher *Dispatcher) Signal() {

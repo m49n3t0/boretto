@@ -20,6 +20,7 @@ CREATE TABLE "task" (
     "retry" BIGINT NOT NULL DEFAULT 8,
     "arguments" JSONB NOT NULL DEFAULT '{}',
     "buffer" JSONB NOT NULL DEFAULT '{}',
+    "todo_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -61,10 +62,8 @@ insert into "robot" ( "function", "version", "status", "definition" ) values
                     ( 'database/create', '1', 'ACTIVE', '{"sequence":[{"name":"STARTING","endpoint_type":"HTTP","endpoint_id":1},{"name":"CHECKING","endpoint_type":"HTTP","endpoint_id":2},{"name":"ON_SERVER","endpoint_type":"HTTP","endpoint_id":3},{"name":"ON_INTERNE","endpoint_type":"HTTP","endpoint_id":4},{"name":"ENDING","endpoint_type":"HTTP","endpoint_id":5}]}' );
 
 
-
-
-
-
+insert into "task" ( "version", "context", "function", "step", "status", "retry" ) values
+                    ( '1', 'toto', 'database/create', 'starting', 'TODO', '8' );
 
 
 

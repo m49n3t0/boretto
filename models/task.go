@@ -13,6 +13,7 @@ type Task struct {
 	Retry        int64                  `sql:"retry,notnull"`
 	Arguments    map[string]interface{} `sql:"arguments,notnull"`
 	Buffer       map[string]interface{} `sql:"buffer,notnull"`
+	TodoDate string                 `sql:"todo_date,notnull"`
 	CreationDate string                 `sql:"creation_date,notnull"`
 	LastUpdate   string                 `sql:"last_update,notnull"`
 }
@@ -27,6 +28,7 @@ const (
 	TblTask_Retry        = `"task"."retry"`
 	TblTask_Arguments    = `"task"."arguments"`
 	TblTask_Buffer       = `"task"."buffer"`
+	TblTask_TodoDate = `"task"."todo_date"`
 	TblTask_CreationDate = `"task"."creation_date"`
 	TblTask_LastUpdate   = `"task"."last_update"`
 )

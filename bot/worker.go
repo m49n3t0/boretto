@@ -8,38 +8,44 @@ import (
 	//	"io/ioutil"
 	//	"net/http"
 	//	"time"
-	"github.com/m49n3t0/boretto/models"
+	//"github.com/m49n3t0/boretto/models"
 	"log"
 	"strconv"
 )
 
+
 ///////////////////////////////////////////////////////////////////////////////
+
 
 // the worker executes the task process
 type Worker struct {
-	function    string
+//	function    string
 	workerPool  chan chan int64
 	taskChannel chan int64
-	robots      *map[int64]*models.Definition
-	endpoints   *map[int64]interface{}
+    dispatcher *Dispatcher
+//	robots      *map[int64]*models.Definition
+//	endpoints   *map[int64]interface{}
 	quit        chan bool
 	//	Definition  *models.Definition
 	//	connector   *gorp.DbMap
 }
 
+
 // function to create a new worker
 func NewWorker(dispatcher *Dispatcher) Worker {
 	return Worker{
-		function:    dispatcher.function,
+		//function:    dispatcher.function,
 		workerPool:  dispatcher.workerPool,
 		taskChannel: make(chan int64),
-		robots:      &dispatcher.robots,
-		endpoints:   &dispatcher.endpoints,
+        dispatcher: dispatcher,
+//		robots:      &dispatcher.robots,
+//		endpoints:   &dispatcher.endpoints,
 		quit:        make(chan bool)}
 
 	//		quit:        make(chan bool),
 	//		Definition:  definition}
 }
+
 
 // Start method starts the run loop for the worker, listening for a quit channel in
 // case we need to stop it
@@ -72,6 +78,7 @@ func (worker *Worker) Start() {
 	}()
 }
 
+
 // stop signals the worker to stop listening for work requests.
 func (worker *Worker) Stop() {
 	go func() {
@@ -79,7 +86,9 @@ func (worker *Worker) Stop() {
 	}()
 }
 
+
 ///////////////////////////////////////////////////////////////////////////////
+
 
 //// Response http from each API response
 //type HttpResponse struct {
@@ -88,17 +97,12 @@ func (worker *Worker) Stop() {
 //	Step     *string
 //	Comment  *string
 //}
-//
+
 
 func (worker *Worker) DoAction(id int64) error {
 
-	return nil
-}
-
-//func (w Worker) Action(id int64) error {
-//
 //	// read the task from the id
-//	task, err := w.readOneTask(id)
+//	task, err := worker.readOneTask(id)
 //
 //	if err != nil {
 //		log.Fatalln("Error while fetching one task", err)
@@ -114,7 +118,7 @@ func (worker *Worker) DoAction(id int64) error {
 //	task.Status = "doing"
 //
 //	// update in database the task
-//	res, err := w.connector.Update(&task)
+//	res, err := worker.connector.Update(&task)
 //
 //	if err != nil {
 //		log.Fatalln("Error while updating the task for status lock : ", err)
@@ -129,7 +133,7 @@ func (worker *Worker) DoAction(id int64) error {
 //	var foundActualStep = false
 //
 //	// which is the actual step data
-//	for _, s := range w.Definition.Sequence {
+//	for _, s := range worker.Definition.Sequence {
 //		if s.Name == task.Step {
 //			actualStep = s
 //			foundActualStep = true
@@ -145,7 +149,7 @@ func (worker *Worker) DoAction(id int64) error {
 //	if foundActualStep {
 //
 //		// do the http call to retrieve API data/informations
-//		httpResponse, statusCode, err = w.CallHttp(task, actualStep)
+//		httpResponse, statusCode, err = worker.CallHttp(task, actualStep)
 //
 //		if err != nil {
 //
@@ -187,145 +191,145 @@ func (worker *Worker) DoAction(id int64) error {
 //	// switch on each status code
 //	switch statusCode {
 //
-//	//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//	//  200  = next                                                         //
-//	//______________________________________________________________________//
-//	case 200:
+//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//        //  200  = next                                                         //
+//        //______________________________________________________________________//
+//        case 200:
 //
-//		// not an ending step
-//		if !actualStep.EndStep {
+//            // not an ending step
+//            if !actualStep.EndStep {
 //
-//			var found = false
+//                var found = false
 //
-//			// retrieve the next step data
-//			for _, s := range w.Definition.Sequence {
-//				if found {
-//					// set the next step
-//					task.Step = s.Name
-//					break
-//				}
-//				if s.Name == task.Step {
-//					found = true
-//				}
-//			}
+//                // retrieve the next step data
+//                for _, s := range worker.Definition.Sequence {
+//                    if found {
+//                        // set the next step
+//                        task.Step = s.Name
+//                        break
+//                    }
+//                    if s.Name == task.Step {
+//                        found = true
+//                    }
+//                }
 //
-//			// no next step found, error
-//			if !found {
+//                // no next step found, error
+//                if !found {
 //
-//				// error status due to no next step founded
-//				statusName = "error"
+//                    // error status due to no next step founded
+//                    statusName = "error"
 //
-//				// forge error comment
-//				var comment = "Impossible to found the next step, maybe a problem in the step sequence"
+//                    // forge error comment
+//                    var comment = "Impossible to found the next step, maybe a problem in the step sequence"
 //
-//				httpResponse.Comment = &comment
-//			}
+//                    httpResponse.Comment = &comment
+//                }
 //
-//		} else {
+//            } else {
 //
-//			// terminate the task
-//			statusName = "done"
+//                // terminate the task
+//                statusName = "done"
 //
-//			// update the done date
-//			var timeNow = time.Now()
-//			task.DoneDate = &timeNow
-//		}
+//                // update the done date
+//                var timeNow = time.Now()
+//                task.DoneDate = &timeNow
+//            }
 //
-//	//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//	//  301  = next to '...' step or/and next in '...' interval of seconds  //
-//	//______________________________________________________________________//
-//	case 301:
+//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//        //  301  = next to '...' step or/and next in '...' interval of seconds  //
+//        //______________________________________________________________________//
+//        case 301:
 //
-//		// an interval is setup to the next execution laster
-//		if httpResponse.Interval != nil {
+//            // an interval is setup to the next execution laster
+//            if httpResponse.Interval != nil {
 //
-//			// interval send in seconds
-//			var interval = *httpResponse.Interval
+//                // interval send in seconds
+//                var interval = *httpResponse.Interval
 //
-//			// if defined an interval
-//			if interval > 0 {
+//                // if defined an interval
+//                if interval > 0 {
 //
-//				// compute the todo date with the interval
-//				var todoDate = *task.TodoDate
-//				var newTodoDate = todoDate.Add(time.Duration(interval) * time.Second)
+//                    // compute the todo date with the interval
+//                    var todoDate = *task.TodoDate
+//                    var newTodoDate = todoDate.Add(time.Duration(interval) * time.Second)
 //
-//				task.TodoDate = &newTodoDate
+//                    task.TodoDate = &newTodoDate
 //
-//				// logger
-//				log.Println("Change the todoDate to '" + newTodoDate.String() + "'")
-//			}
-//		}
+//                    // logger
+//                    log.Println("Change the todoDate to '" + newTodoDate.String() + "'")
+//                }
+//            }
 //
-//		// a next step definition
-//		if httpResponse.Step != nil {
+//            // a next step definition
+//            if httpResponse.Step != nil {
 //
-//			// new step name
-//			var stepName = *httpResponse.Step
+//                // new step name
+//                var stepName = *httpResponse.Step
 //
-//			// flag founded
-//			var found = false
+//                // flag founded
+//                var found = false
 //
-//			// new step exists in the sequence
-//			for _, s := range w.Definition.Sequence {
-//				// found the asked overwritted step
-//				if s.Name == stepName {
-//					found = true
-//					break
-//				}
-//			}
+//                // new step exists in the sequence
+//                for _, s := range worker.Definition.Sequence {
+//                    // found the asked overwritted step
+//                    if s.Name == stepName {
+//                        found = true
+//                        break
+//                    }
+//                }
 //
-//			// step founded in the sequence
-//			if found {
+//                // step founded in the sequence
+//                if found {
 //
-//				// overwrite the step
-//				task.Step = stepName
+//                    // overwrite the step
+//                    task.Step = stepName
 //
-//				// logger
-//				log.Println("Change the next step to '" + stepName + "'")
+//                    // logger
+//                    log.Println("Change the next step to '" + stepName + "'")
 //
-//			} else {
+//                } else {
 //
-//				// error while the overwriting of the next step
-//				statusName = "error"
+//                    // error while the overwriting of the next step
+//                    statusName = "error"
 //
-//				// forge error comment
-//				var comment = "Impossible to found the next step, maybe the overwrite step name doesn't exists"
+//                    // forge error comment
+//                    var comment = "Impossible to found the next step, maybe the overwrite step name doesn't exists"
 //
-//				// logger
-//				log.Println(comment)
+//                    // logger
+//                    log.Println(comment)
 //
-//				httpResponse.Comment = &comment
-//			}
-//		}
+//                    httpResponse.Comment = &comment
+//                }
+//            }
 //
-//	//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//	//  420  = cancelled                                                    //
-//	//______________________________________________________________________//
-//	case 420:
+//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//        //  420  = cancelled                                                    //
+//        //______________________________________________________________________//
+//        case 420:
 //
-//		// Setup the status
-//		statusName = "cancelled"
+//            // Setup the status
+//            statusName = "cancelled"
 //
-//	//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//	//  520  = problem                                                      //
-//	//______________________________________________________________________//
-//	case 520:
+//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//        //  520  = problem                                                      //
+//        //______________________________________________________________________//
+//        case 520:
 //
-//		// Setup the status
-//		statusName = "problem"
+//            // Setup the status
+//            statusName = "problem"
 //
-//	//‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//	// other = error ( 5XX : auto-retry )                                   //
-//	//______________________________________________________________________//
-//	default:
+//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+//        // other = error ( 5XX : auto-retry )                                   //
+//        //______________________________________________________________________//
+//        default:
 //
-//		// Error process
-//		statusName = "error"
+//            // Error process
+//            statusName = "error"
 //
-//		// Exception for 5XX status code, auto retry if possible
-//		if ((statusCode / 100) == 5) && (task.Retry > 1) {
-//			statusName = "todo"
-//		}
+//            // Exception for 5XX status code, auto retry if possible
+//            if ((statusCode / 100) == 5) && (task.Retry > 1) {
+//                statusName = "todo"
+//            }
 //
 //	}
 //
@@ -357,7 +361,7 @@ func (worker *Worker) DoAction(id int64) error {
 //	log.Println("Task updation")
 //
 //	// update the database
-//	num, err := w.connector.Update(&task)
+//	num, err := worker.connector.Update(&task)
 //
 //	if err != nil {
 //		log.Fatalln("Error while update on the database the task", err)
@@ -372,12 +376,23 @@ func (worker *Worker) DoAction(id int64) error {
 //	}
 //
 //	log.Println("Task updated")
-//
-//	return nil
-//}
-//
-/////////////////////////////////////////////////////////////////////////////////
-//
+
+	return nil
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+
+
+
 //type HttpOut struct {
 //	Name      string
 //	Arguments JsonB
