@@ -74,13 +74,13 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	log.Println("Get the robot configuration")
 
 	// object to fetch
-	var machines []*models.Machine
+	var robots []*models.Robot
 
 	// get the robot data
 	err := dispatcher.db.
-		Model(&machines).
-		Where(models.TblMachine_Function+" = ?", dispatcher.function).
-		Where(models.TblMachine_Status+" = ?", "ACTIVE").
+		Model(&robots).
+		Where(models.TblRobot_Function+" = ?", dispatcher.function).
+		Where(models.TblRobot_Status+" = ?", "ACTIVE").
 		Select()
 
 	log.Println("1================")
@@ -93,9 +93,9 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	log.Println("2================")
 
 	// no elements, error
-	if len(machines) == 0 {
-		log.Println("Error no machines definition found")
-		return errors.New("No machines definition found")
+	if len(robots) == 0 {
+		log.Println("Error no robots definition found")
+		return errors.New("No robots definition found")
 	}
 
 	log.Println("3================")
@@ -106,18 +106,18 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	log.Println("4.0================")
 
 	// store into dispatcher definitions data
-	for _, machine := range machines {
+	for _, robot := range robots {
 
 		log.Println("4.1.............")
-		log.Printf("%+v", machine)
+		log.Printf("%+v", robot)
 
 		// remap by version the definitions
-		dispatcher.definitions[machine.Version] = &machine.Definition
+		dispatcher.definitions[robot.Version] = &robot.Definition
 
 		log.Println("4.2.............")
 
 		// save the step IDs to fetch after
-		for _, step := range machine.Definition.Sequence {
+		for _, step := range robot.Definition.Sequence {
 			stepIDs = append(stepIDs, step.EndpointID)
 		}
 	}
