@@ -13,7 +13,7 @@ type Task struct {
 	Context      string                 `sql:"context,notnull"`
 	Function     string                 `sql:"function,notnull"`
 	Step         string                 `sql:"step,notnull"`
-	Status       string                 `sql:"status,notnull"`
+	Status       TaskStatus                 `sql:"status,notnull"`
 	Retry        int64                  `sql:"retry,notnull"`
 	CreationDate time.Time              `sql:"creation_date,notnull"`
 	LastUpdate   time.Time              `sql:"last_update,notnull"`
@@ -21,6 +21,7 @@ type Task struct {
 	DoneDate     *time.Time             `sql:"done_date"`
 	Arguments    map[string]interface{} `sql:"arguments,notnull"`
 	Buffer       map[string]interface{} `sql:"buffer,notnull"`
+    Comment      *string                 `sql:"comment"`
 }
 
 const (
@@ -37,6 +38,7 @@ const (
 	TblTask_DoneDate     = `"task"."done_date"`
 	TblTask_Arguments    = `"task"."arguments"`
 	TblTask_Buffer       = `"task"."buffer"`
+    TblTask_Comment     = `"task"."comment"`
 )
 
 const (
@@ -53,4 +55,5 @@ const (
 	ColTask_DoneDate     = `"done_date"`
 	ColTask_Arguments    = `"arguments"`
 	ColTask_Buffer       = `"buffer"`
+    ColTask_Comment      = `"comment"`
 )

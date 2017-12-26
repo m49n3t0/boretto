@@ -188,9 +188,13 @@ func (worker *Worker) DoAction(id int64) error {
 
 
 
-
-
-
+//
+//  type EndpointResponse struct {
+//      Action  EndpointResponseAction  `json:"action,notnull"`
+//      Buffer  *JsonB                  `json:"buffer"`
+//      Data    *EndpointResponseData   `json:"data"`
+//  }
+//
 //  buffer: interface{},
 //  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
 //  data: {
@@ -200,19 +204,7 @@ func (worker *Worker) DoAction(id int64) error {
 //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
 //      no_decrement: bool                          --> optional : only for RETRY action
 //  },
-
-
-//// Response http from each API response
-//type HttpResponse struct {
-//	Buffer   *JsonB
-//	Interval *int
-//	Step     *string
-//	Comment  *string
-//}
-
-
-
-
+//
 	// vars
 	var httpResponse HttpResponse
 	var statusCode int
@@ -263,6 +255,31 @@ func (worker *Worker) DoAction(id int64) error {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //
+    //  type EndpointResponse struct {
+    //      Action  EndpointResponseAction  `json:"action,notnull"`
+    //      Buffer  *JsonB                  `json:"buffer"`
+    //      Data    *EndpointResponseData   `json:"data"`
+    //  }
+    //
     //  buffer: interface{},
     //  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
     //  data: {
@@ -272,38 +289,113 @@ func (worker *Worker) DoAction(id int64) error {
     //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
     //      no_decrement: bool                          --> optional : only for RETRY action
     //  },
+    //
+
+    if response.Buffer defined ... {
+
+        // update the local buffer
+
+    }
+
+
+    if response.Action == EndpointResponseAction_NULL {
+
+        // error , no action give to do
+
+    }
+
+
+func onResponseInterval(task *models.Task, response *models.EndpointResponse) error {
+
+    // interval is defined ?
+    if response.Data.Interval == nil || *response.Data.Interval == 0 {
+		return errors.New("Missing interval parameter from API return")
+    }
+
+    // correctly setted ?
+    if *response.Data.Interval <= 60 {
+        log.Println("Bad interval from the API return, reset interval to the default 60s")
+
+        *response.Data.Interval = 60
+    }
+
+    // update the task todo date
+    //task.TodoDate = common.dateTools( now() + *response.Data.Interval )
+
+    // ok
+    return nil
+}
+
+func onResponseStep(task *models.Task, response *models.EndpointResponse) error {
+
+    // step is defined ?
+    if response.Data.Step == nil || *respnse.Data.Step == "" {
+        return errors.New("Missing step parameter from API return")
+    }
+
+    // flag to know if found or not
+    var found = false
+
+    // asked step exists in the sequence
+    for _, s := range definition.Sequence {
+        // found the asked step
+        if s.Name == *response.Data.Step {
+            found = true
+            break
+        }
+    }
+
+    // not found, error
+    if !found {
+        return errors.New("Impossible to found the asked step from the API return")
+    }
+
+    // update the task step
+    task.Step = *response.Data.Step
+
+    // ok
+    return nil
+}
 
 
 
 
+    if response.Action == models.EndpointResponseAction_GOTO
+        || response.Action == models.EndpointResponseAction_GOTO_LATER {
 
+        // interval setting
+        err = onResponseInterval(task, response)
+        if err != nil {
 
+        }
 
+        // step setting
+        err = onResponseStep(task, response)
+        if err != nil {
 
+            var comment = "Impossible to found the asked next step from the API return"
 
+            // update task
+            task.Status = models.TaskStatus_ERROR
+            task.Comment = &comment
 
+            log.Println( comment )
+        }
 
+        task.Status = models.TaskStatus_TODO
 
+        log.Printf("Change the next step to '%s'", askedStep)
 
+    }
 
-
-
-
-
-
-
-
-
-	// default value
-	var statusName = "todo"
-
-	// switch on each status code
-	switch statusCode {
+    if response.Action == EndpointResponseAction_NEXT {
 
         //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
         //  200  = next                                                         //
         //______________________________________________________________________//
         case 200:
+
+            var statusName = "todo"
 
             // not an ending step
             if !actualStep.EndStep {
@@ -344,103 +436,274 @@ func (worker *Worker) DoAction(id int64) error {
                 task.DoneDate = &timeNow
             }
 
+
+
+        // find the next step, save it and continue
+
+    }
+
+
+    if response.Action == EndpointResponseAction_NEXT_LATER {
+
+
         //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-        //  301  = next to '...' step or/and next in '...' interval of seconds  //
+        //  200  = next                                                         //
         //______________________________________________________________________//
-        case 301:
+        case 200:
 
-            // an interval is setup to the next execution laster
-            if httpResponse.Interval != nil {
+            var statusName = "todo"
 
-                // interval send in seconds
-                var interval = *httpResponse.Interval
+            // not an ending step
+            if !actualStep.EndStep {
 
-                // if defined an interval
-                if interval > 0 {
-
-                    // compute the todo date with the interval
-                    var todoDate = *task.TodoDate
-                    var newTodoDate = todoDate.Add(time.Duration(interval) * time.Second)
-
-                    task.TodoDate = &newTodoDate
-
-                    // logger
-                    log.Println("Change the todoDate to '" + newTodoDate.String() + "'")
-                }
-            }
-
-            // a next step definition
-            if httpResponse.Step != nil {
-
-                // new step name
-                var stepName = *httpResponse.Step
-
-                // flag founded
                 var found = false
 
-                // new step exists in the sequence
+                // retrieve the next step data
                 for _, s := range worker.Definition.Sequence {
-                    // found the asked overwritted step
-                    if s.Name == stepName {
-                        found = true
+                    if found {
+                        // set the next step
+                        task.Step = s.Name
                         break
+                    }
+                    if s.Name == task.Step {
+                        found = true
                     }
                 }
 
-                // step founded in the sequence
-                if found {
+                // no next step found, error
+                if !found {
 
-                    // overwrite the step
-                    task.Step = stepName
-
-                    // logger
-                    log.Println("Change the next step to '" + stepName + "'")
-
-                } else {
-
-                    // error while the overwriting of the next step
+                    // error status due to no next step founded
                     statusName = "error"
 
                     // forge error comment
-                    var comment = "Impossible to found the next step, maybe the overwrite step name doesn't exists"
-
-                    // logger
-                    log.Println(comment)
+                    var comment = "Impossible to found the next step, maybe a problem in the step sequence"
 
                     httpResponse.Comment = &comment
                 }
+
+            } else {
+
+                // terminate the task
+                statusName = "done"
+
+                // update the done date
+                var timeNow = time.Now()
+                task.DoneDate = &timeNow
             }
 
-        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-        //  420  = cancelled                                                    //
-        //______________________________________________________________________//
-        case 420:
 
-            // Setup the status
-            statusName = "cancelled"
+        //
+        //  data: {
+        //      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
+        //  },
+        //
 
-        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-        //  520  = problem                                                      //
-        //______________________________________________________________________//
-        case 520:
+    }
 
-            // Setup the status
-            statusName = "problem"
+    if response.Action == EndpointResponseAction_RETRY {
 
-        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-        // other = error ( 5XX : auto-retry )                                   //
-        //______________________________________________________________________//
-        default:
+        //
+        //  data: {
+        //      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
+        //      no_decrement: bool                          --> optional : only for RETRY action
+        //  },
+        //
 
-            // Error process
-            statusName = "error"
+    }
 
-            // Exception for 5XX status code, auto retry if possible
-            if ((statusCode / 100) == 5) && (task.Retry > 1) {
-                statusName = "todo"
+    if response.Action == EndpointResponseAction_RETRY_NOW {
+
+        //
+
+    }
+
+    if response.Action == EndpointResponseAction_ERROR {
+
+        //
+        //  data: {
+        //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
+        //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field logger
+        //  },
+        //
+
+    }
+
+    if response.Action == EndpointResponseAction_PROBLEM {
+
+        //
+        //  data: {
+        //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
+        //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field logger
+        //  },
+        //
+
+    }
+
+    if response.Action == EndpointResponseAction_CANCELED {
+
+        //
+        //  data: {
+        //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
+        //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field logger
+        //  },
+        //
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+//  type EndpointResponse struct {
+//      Action  EndpointResponseAction  `json:"action,notnull"`
+//      Buffer  *JsonB                  `json:"buffer"`
+//      Data    *EndpointResponseData   `json:"data"`
+//  }
+//
+//  buffer: interface{},
+//  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
+//  data: {
+//      step: string                                --> optional : only for GOTO/GOTO_LATER action
+//      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
+//      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
+//      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+//      no_decrement: bool                          --> optional : only for RETRY action
+//  },
+//
+
+
+
+
+
+
+
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    //  301  = next to '...' step or/and next in '...' interval of seconds  //
+    //______________________________________________________________________//
+    case 301:
+
+        var statusName = "todo"
+
+        // an interval is setup to the next execution laster
+        if httpResponse.Interval != nil {
+
+            // interval send in seconds
+            var interval = *httpResponse.Interval
+
+            // if defined an interval
+            if interval > 0 {
+
+                // compute the todo date with the interval
+                var todoDate = *task.TodoDate
+                var newTodoDate = todoDate.Add(time.Duration(interval) * time.Second)
+
+                task.TodoDate = &newTodoDate
+
+                // logger
+                log.Println("Change the todoDate to '" + newTodoDate.String() + "'")
+            }
+        }
+
+        // a next step definition
+        if httpResponse.Step != nil {
+
+            // new step name
+            var stepName = *httpResponse.Step
+
+            // flag founded
+            var found = false
+
+            // new step exists in the sequence
+            for _, s := range worker.Definition.Sequence {
+                // found the asked overwritted step
+                if s.Name == stepName {
+                    found = true
+                    break
+                }
             }
 
-	}
+            // step founded in the sequence
+            if found {
+
+                // overwrite the step
+                task.Step = stepName
+
+                // logger
+                log.Println("Change the next step to '" + stepName + "'")
+
+            } else {
+
+                // error while the overwriting of the next step
+                statusName = "error"
+
+                // forge error comment
+                var comment = "Impossible to found the next step, maybe the overwrite step name doesn't exists"
+
+                // logger
+                log.Println(comment)
+
+                httpResponse.Comment = &comment
+            }
+        }
+
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    //  420  = cancelled                                                    //
+    //______________________________________________________________________//
+    case 420:
+
+        var statusName = "todo"
+
+        // Setup the status
+        statusName = "cancelled"
+
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    //  520  = problem                                                      //
+    //______________________________________________________________________//
+    case 520:
+
+        var statusName = "todo"
+
+        // Setup the status
+        statusName = "problem"
+
+    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
+    // other = error ( 5XX : auto-retry )                                   //
+    //______________________________________________________________________//
+    default:
+
+        var statusName = "todo"
+
+        // Error process
+        statusName = "error"
+
+        // Exception for 5XX status code, auto retry if possible
+        if ((statusCode / 100) == 5) && (task.Retry > 1) {
+            statusName = "todo"
+        }
+
 
 	// buffer key update
 	task.Buffer = *httpResponse.Buffer
@@ -505,239 +768,6 @@ func (worker *Worker) DoAction(id int64) error {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-//// Response http from each API response
-//type HttpResponse struct {
-//	Buffer   *JsonB
-//	Interval *int
-//	Step     *string
-//	Comment  *string
-//}
-
-// do the call on http endpoints
-func (worker *Worker) DoHttpAction(endpoint *models.HttpEndpoint) error {
-
-//	// vars
-//	var httpResponse HttpResponse
-//	var statusCode int
-
-//	// actual step process
-//	if foundActualStep {
-//
-//		// do the http call to retrieve API data/informations
-//		httpResponse, statusCode, err = worker.CallHttp(task, actualStep)
-//
-//		if err != nil {
-//
-//			// error while doing the http call on api's
-//			var comment = "Error while doing the http call on api's"
-//
-//			log.Fatalln(comment)
-//
-//			// forge an error status code
-//			statusCode = 500
-//
-//			// forge a fake http response
-//			httpResponse = HttpResponse{
-//				Buffer:  &task.Buffer, // repush the same buffer
-//				Comment: &comment}     // forge a comment
-//
-//		}
-//
-//    }
-//	} else {
-//
-//		// no step associated for this step name
-//		var comment = "Error while check the actual step informations"
-//
-//		log.Fatalln(comment)
-//
-//		// forge an error status code
-//		statusCode = 600
-//
-//		// forge a fake http response
-//		httpResponse = HttpResponse{
-//			Buffer:  &task.Buffer, // repush the same buffer
-//			Comment: &comment}     // forge a comment
-//
-//	}
-
-//	// default value
-//	var statusName = "todo"
-//
-//	// switch on each status code
-//	switch statusCode {
-//
-//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//        //  200  = next                                                         //
-//        //______________________________________________________________________//
-//        case 200:
-//
-//            // not an ending step
-//            if !actualStep.EndStep {
-//
-//                var found = false
-//
-//                // retrieve the next step data
-//                for _, s := range worker.Definition.Sequence {
-//                    if found {
-//                        // set the next step
-//                        task.Step = s.Name
-//                        break
-//                    }
-//                    if s.Name == task.Step {
-//                        found = true
-//                    }
-//                }
-//
-//                // no next step found, error
-//                if !found {
-//
-//                    // error status due to no next step founded
-//                    statusName = "error"
-//
-//                    // forge error comment
-//                    var comment = "Impossible to found the next step, maybe a problem in the step sequence"
-//
-//                    httpResponse.Comment = &comment
-//                }
-//
-//            } else {
-//
-//                // terminate the task
-//                statusName = "done"
-//
-//                // update the done date
-//                var timeNow = time.Now()
-//                task.DoneDate = &timeNow
-//            }
-//
-//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//        //  301  = next to '...' step or/and next in '...' interval of seconds  //
-//        //______________________________________________________________________//
-//        case 301:
-//
-//            // an interval is setup to the next execution laster
-//            if httpResponse.Interval != nil {
-//
-//                // interval send in seconds
-//                var interval = *httpResponse.Interval
-//
-//                // if defined an interval
-//                if interval > 0 {
-//
-//                    // compute the todo date with the interval
-//                    var todoDate = *task.TodoDate
-//                    var newTodoDate = todoDate.Add(time.Duration(interval) * time.Second)
-//
-//                    task.TodoDate = &newTodoDate
-//
-//                    // logger
-//                    log.Println("Change the todoDate to '" + newTodoDate.String() + "'")
-//                }
-//            }
-//
-//            // a next step definition
-//            if httpResponse.Step != nil {
-//
-//                // new step name
-//                var stepName = *httpResponse.Step
-//
-//                // flag founded
-//                var found = false
-//
-//                // new step exists in the sequence
-//                for _, s := range worker.Definition.Sequence {
-//                    // found the asked overwritted step
-//                    if s.Name == stepName {
-//                        found = true
-//                        break
-//                    }
-//                }
-//
-//                // step founded in the sequence
-//                if found {
-//
-//                    // overwrite the step
-//                    task.Step = stepName
-//
-//                    // logger
-//                    log.Println("Change the next step to '" + stepName + "'")
-//
-//                } else {
-//
-//                    // error while the overwriting of the next step
-//                    statusName = "error"
-//
-//                    // forge error comment
-//                    var comment = "Impossible to found the next step, maybe the overwrite step name doesn't exists"
-//
-//                    // logger
-//                    log.Println(comment)
-//
-//                    httpResponse.Comment = &comment
-//                }
-//            }
-//
-//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//        //  420  = cancelled                                                    //
-//        //______________________________________________________________________//
-//        case 420:
-//
-//            // Setup the status
-//            statusName = "cancelled"
-//
-//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//        //  520  = problem                                                      //
-//        //______________________________________________________________________//
-//        case 520:
-//
-//            // Setup the status
-//            statusName = "problem"
-//
-//        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-//        // other = error ( 5XX : auto-retry )                                   //
-//        //______________________________________________________________________//
-//        default:
-//
-//            // Error process
-//            statusName = "error"
-//
-//            // Exception for 5XX status code, auto retry if possible
-//            if ((statusCode / 100) == 5) && (task.Retry > 1) {
-//                statusName = "todo"
-//            }
-//
-//	}
-//
-//	// buffer key update
-//	task.Buffer = *httpResponse.Buffer
-//
-//	// status key update
-//	task.Status = statusName
-//
-//	// last update key update
-//	timeNow = time.Now()
-//	task.LastUpdate = &timeNow
-//
-//	// retry key update
-//	task.Retry = task.Retry - 1
-//
-//	// comment key update
-//	if httpResponse.Comment != nil {
-//
-//		// retrieve the comment string
-//		var comment = *httpResponse.Comment // string
-//
-//		// change it only if not empty
-//		if comment != "" {
-//			task.Comment = comment
-//		}
-//	}
-//
-//	log.Println("Task updation")
-
-	return nil
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 

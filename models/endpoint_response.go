@@ -9,9 +9,9 @@ import (
 
 
 type EndpointResponse struct {
-    Buffer *JsonB `json:"buffer"`
     Action  EndpointResponseAction `json:"action,notnull"`
-    Data EndpointResponseData `json:"data,notnull"`
+    Buffer *JsonB `json:"buffer"`
+    Data *EndpointResponseData `json:"data"`
 }
 
 
