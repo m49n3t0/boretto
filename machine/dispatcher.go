@@ -18,19 +18,19 @@ import (
 type Dispatcher struct {
 
 	// function on what the robot work
-	function        string
+	function string
 
 	// store datas from database
-	definitions     map[int64]*models.Definition
-	endpoints       map[int64]*models.Endpoint
+	definitions map[int64]*models.Definition
+	endpoints   map[int64]*models.Endpoint
 
 	// manage the distribution of workflow
-	workerPool      chan chan int64
-	queue           chan int64
+	workerPool chan chan int64
+	queue      chan int64
 
 	// manage the quit process
-	signal          chan os.Signal
-	quit            chan bool
+	signal chan os.Signal
+	quit   chan bool
 
 	// database handler
 	db *pg.DB
@@ -40,20 +40,20 @@ type Dispatcher struct {
 func New() (*Dispatcher, error) {
 
 	definitions := make(map[int64]*models.Definition)
-	endpoints   := make(map[int64]*models.Endpoint)
-	workerPool  := make(chan chan int64, MAX_WORKER)
-	queue       := make(chan int64, MAX_QUEUE)
-	signal      := make(chan os.Signal, 2)
-	quit        := make(chan bool)
+	endpoints := make(map[int64]*models.Endpoint)
+	workerPool := make(chan chan int64, MAX_WORKER)
+	queue := make(chan int64, MAX_QUEUE)
+	signal := make(chan os.Signal, 2)
+	quit := make(chan bool)
 
 	dispatcher := &Dispatcher{
-		function:       FUNCTION,
-        definitions:    definitions,
-		endpoints:      endpoints,
-		workerPool:     workerPool,
-		queue:          queue,
-		signal:         signal,
-		quit:           quit,
+		function:    FUNCTION,
+		definitions: definitions,
+		endpoints:   endpoints,
+		workerPool:  workerPool,
+		queue:       queue,
+		signal:      signal,
+		quit:        quit,
 	}
 
 	return dispatcher, nil
@@ -111,25 +111,25 @@ func (dispatcher *Dispatcher) launch() {
 
 	for {
 		select {
-		case taskId := <-dispatcher.queue:
+            case taskId := <-dispatcher.queue:
 
-			log.Printf("Dispatch to taskChannel with ID : " + strconv.Itoa(int(taskId)))
+                log.Printf("Dispatch to taskChannel with ID: %d\n", taskId)
 
-			// try to obtain a worker task channel that is available.
-			// this will block until a worker is idle
-			taskChannel := <-dispatcher.workerPool
+                // try to obtain a worker task channel that is available.
+                // this will block until a worker is idle
+                taskChannel := <-dispatcher.workerPool
 
-			// dispatch the task to the worker task channel
-			taskChannel <- taskId
+                // dispatch the task to the worker task channel
+                taskChannel <- taskId
 
-		case <-dispatcher.quit:
+            case <-dispatcher.quit:
 
-			// we have received a signal to stop
-			log.Println("RECEIVE QUIT")
+                // we have received a signal to stop
+                log.Println("RECEIVE QUIT")
 
-			// XXX : how to stop workers correctly
+                // XXX : how to stop workers correctly
 
-			os.Exit(1)
+                os.Exit(1)
 		}
 	}
 }

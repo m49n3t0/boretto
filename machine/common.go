@@ -8,7 +8,7 @@ import (
 
 var (
 	// robot configuration
-	FUNCTION    = os.Getenv("FUNCTION")
+	FUNCTION = os.Getenv("FUNCTION")
 
 	// database configuration
 	DB_HOST     = os.Getenv("DB_HOST")
@@ -18,6 +18,6 @@ var (
 	DB_DATABASE = os.Getenv("DB_DATABASE")
 
 	// dispatcher configuration
-	MAX_WORKER  = 20
-	MAX_QUEUE   = 5
+	MAX_WORKER = 20
+	MAX_QUEUE  = 5
 )

@@ -1,7 +1,7 @@
 
 --+Migrate Down
 
-drop table if exists "machine";
+drop table if exists "robot";
 drop table if exists "header";
 drop table if exists "endpoint";
 drop table if exists "task";
@@ -43,7 +43,7 @@ create table "header" (
     "last_update" timestamp with time zone not null default now()
 );
 
-create table "machine" (
+create table "robot" (
     "id" bigserial primary key not null,
     "function" character varying(255) not null,
     "version" bigint not null,
