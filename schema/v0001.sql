@@ -1,69 +1,72 @@
 
 --+Migrate Down
 
-DROP TABLE IF EXISTS "robot";
-
-DROP TABLE IF EXISTS "http_endpoint";
-DROP TABLE IF EXISTS "endpoint";
-
-DROP TABLE IF EXISTS "task";
+drop table if exists "machine";
+drop table if exists "header";
+drop table if exists "endpoint";
+drop table if exists "task";
 
 --+Migrate Up
 
-CREATE TABLE "task" (
-    "id" BIGSERIAL PRIMARY KEY NOT NULL,
-    "version" BIGINT NOT NULL,
-    "context" CHARACTER VARYING(255) NOT NULL,
-    "function" CHARACTER VARYING(255) NOT NULL,
-    "step" CHARACTER VARYING(255) NOT NULL,
-    "status" CHARACTER VARYING(255) NOT NULL,
-    "retry" BIGINT NOT NULL DEFAULT 8,
-    "arguments" JSONB NOT NULL DEFAULT '{}',
-    "buffer" JSONB NOT NULL DEFAULT '{}',
-    "todo_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+create table "task" (
+    "id" bigserial primary key not null,
+    "version" bigint not null,
+    "context" character varying(255) not null,
+    "function" character varying(255) not null,
+    "step" character varying(255) not null,
+    "status" character varying(255) not null,
+    "retry" bigint not null default 8,
+    "creation_date" timestamp with time zone not null default now(),
+    "last_update" timestamp with time zone not null default now(),
+    "todo_date" timestamp with time zone not null default now(),
+    "done_date" timestamp with time zone,
+    "arguments" jsonb not null default '{}',
+    "buffer" jsonb not null default '{}'
 );
 
-CREATE TABLE "endpoint" (
-    "id" BIGSERIAL PRIMARY KEY NOT NULL,
-    "type" CHARACTER VARYING(255) NOT NULL,
-    "version" BIGINT NOT NULL,
-    "name" CHARACTER VARYING(255) NOT NULL,
-    "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    CONSTRAINT "endpoint_unique_name" UNIQUE("name")
+create table "endpoint" (
+    "id" bigserial primary key not null,
+    "version" bigint not null,
+    "name" character varying(255) not null,
+    "method" character varying(255) not null,
+    "url" character varying(255) not null,
+    "creation_date" timestamp with time zone not null default now(),
+    "last_update" timestamp with time zone not null default now(),
+    constraint "endpoint_unique_name" unique("name")
 );
 
-CREATE TABLE "http_endpoint" (
-    "method" CHARACTER VARYING(255) NOT NULL,
-    "url" CHARACTER VARYING(255) NOT NULL,
-    CONSTRAINT "endpoint_http_check" CHECK ("type"='HTTP')
-) INHERITS ("endpoint");
-
-CREATE TABLE "robot" (
-    "id" BIGSERIAL PRIMARY KEY NOT NULL,
-    "function" CHARACTER VARYING(255) NOT NULL,
-    "version" BIGINT NOT NULL,
-    "status" CHARACTER VARYING(255) NOT NULL,
-    "definition" JSONB NOT NULL DEFAULT '{}',
-    "creation_date" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    "last_update" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+create table "header" (
+    "id" bigserial primary key not null,
+    "name" character varying(255) not null,
+    "value" character varying(255) not null,
+    "creation_date" timestamp with time zone not null default now(),
+    "last_update" timestamp with time zone not null default now()
 );
 
-insert into "http_endpoint" ( "type", "version", "name", "method", "url" ) values
-                            ( 'HTTP', '1', 'starting', 'GET', 'https://api.com/starting' ),
-                            ( 'HTTP', '1', 'checking', 'GET', 'https://api.com/checking' ),
-                            ( 'HTTP', '1', 'onServer', 'GET', 'https://api.com/onServer' ),
-                            ( 'HTTP', '1', 'onInterne', 'GET', 'https://api.com/onInterne' ),
-                            ( 'HTTP', '1', 'ending', 'GET', 'https://api.com/ending' );
+create table "machine" (
+    "id" bigserial primary key not null,
+    "function" character varying(255) not null,
+    "version" bigint not null,
+    "status" character varying(255) not null,
+    "definition" jsonb not null default '{}',
+    "creation_date" timestamp with time zone not null default now(),
+    "last_update" timestamp with time zone not null default now()
+);
 
-insert into "robot" ( "function", "version", "status", "definition" ) values
-                    ( 'database/create', '1', 'ACTIVE', '{"sequence":[{"name":"STARTING","endpoint_type":"HTTP","endpoint_id":1},{"name":"CHECKING","endpoint_type":"HTTP","endpoint_id":2},{"name":"ON_SERVER","endpoint_type":"HTTP","endpoint_id":3},{"name":"ON_INTERNE","endpoint_type":"HTTP","endpoint_id":4},{"name":"ENDING","endpoint_type":"HTTP","endpoint_id":5}]}' );
+--insert into "http_endpoint" ( "type", "version", "name", "method", "url" ) values
+--                            ( 'http', '1', 'starting', 'get', 'https://api.ovh.com/1.0/' ),
+--                            ( 'http', '1', 'checking', 'get', 'https://api.ovh.com/1.0/checking' ),
+--                            ( 'http', '1', 'onserver', 'get', 'https://api.ovh.com/1.0/onserver' ),
+--                            ( 'http', '1', 'oninterne', 'get', 'https://api.ovh.com/1.0/oninterne' ),
+--                            ( 'http', '1', 'ending', 'get', 'https://api.ovh.com/1.0/ending' );
+--
+--insert into "robot" ( "function", "version", "status", "definition" ) values
+--                    ( 'database/create', '1', 'active', '{"sequence":[{"name":"starting","endpoint_type":"http","endpoint_id":1},{"name":"checking","endpoint_type":"http","endpoint_id":2},{"name":"on_server","endpoint_type":"http","endpoint_id":3},{"name":"on_interne","endpoint_type":"http","endpoint_id":4},{"name":"ending","endpoint_type":"http","endpoint_id":5}]}' );
+--
+--
+--insert into "task" ( "version", "context", "function", "step", "status", "retry" ) values
+--                    ( '1', 'toto', 'database/create', 'starting', 'todo', '8' );
 
-
-insert into "task" ( "version", "context", "function", "step", "status", "retry" ) values
-                    ( '1', 'toto', 'database/create', 'STARTING', 'TODO', '8' );
 
 
 

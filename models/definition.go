@@ -46,7 +46,6 @@ func (e Definition) Value() (driver.Value, error) {
 	if e.Sequence == nil {
 		e.Sequence = emptySlice
 	}
-
 	jsonBytes, _ := json.Marshal(e)
 	return string(jsonBytes), nil
 }

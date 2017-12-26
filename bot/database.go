@@ -309,7 +309,8 @@ func (dispatcher *Dispatcher) listen() error {
 			}
 
 		// recursive auto-pull
-		case <-time.After(90 * time.Second):
+//		case <-time.After(90 * time.Second):
+		case <-time.After(10 * time.Second):
 
 			// logger
 			log.Println("Auto-pull")
