@@ -18,42 +18,42 @@ import (
 type Dispatcher struct {
 
 	// function on what the robot work
-	function string
+	function        string
 
 	// store datas from database
-	robots    map[int64]*models.Definition
-	endpoints map[int64]interface{}
+	definitions     map[int64]*models.Definition
+	endpoints       map[int64]*models.Endpoint
 
 	// manage the distribution of workflow
-	workerPool chan chan int64
-	queue      chan int64
+	workerPool      chan chan int64
+	queue           chan int64
 
 	// manage the quit process
-	signal chan os.Signal
-	quit   chan bool
+	signal          chan os.Signal
+	quit            chan bool
 
 	// database handler
 	db *pg.DB
 }
 
-// dispatcher create handler
+// dispatcher creation handler
 func New() (*Dispatcher, error) {
 
-	robots := make(map[int64]*models.Definition)
-	endpoints := make(map[int64]interface{})
-	workerPool := make(chan chan int64, ENV_MAX_WORKER)
-	queue := make(chan int64, ENV_MAX_QUEUE)
-	signal := make(chan os.Signal, 2)
-	quit := make(chan bool)
+	definitions := make(map[int64]*models.Definition)
+	endpoints   := make(map[int64]*models.Endpoint)
+	workerPool  := make(chan chan int64, MAX_WORKER)
+	queue       := make(chan int64, MAX_QUEUE)
+	signal      := make(chan os.Signal, 2)
+	quit        := make(chan bool)
 
 	dispatcher := &Dispatcher{
-		function:   ENV_FUNCTION,
-		robots:     robots,
-		endpoints:  endpoints,
-		workerPool: workerPool,
-		queue:      queue,
-		signal:     signal,
-		quit:       quit,
+		function:       FUNCTION,
+        definitions:    definitions,
+		endpoints:      endpoints,
+		workerPool:     workerPool,
+		queue:          queue,
+		signal:         signal,
+		quit:           quit,
 	}
 
 	return dispatcher, nil

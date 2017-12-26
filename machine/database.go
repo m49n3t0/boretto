@@ -15,18 +15,18 @@ import (
 func (dispatcher *Dispatcher) dbConnect() error {
 
 	// build database host address
-	var addr = ENV_DB_HOST
+	var addr = DB_HOST
 
-	if ENV_DB_PORT != "" {
-		addr += ":" + ENV_DB_PORT
+	if DB_PORT != "" {
+		addr += ":" + DB_PORT
 	}
 
 	// pg database connector
 	db := pg.Connect(&pg.Options{
-		Addr:       ENV_DB_HOST + ":" + ENV_DB_PORT,
-		User:       ENV_DB_USER,
-		Password:   ENV_DB_PASSWORD,
-		Database:   ENV_DB_DATABASE,
+		Addr:       addr,
+		User:       DB_USER,
+		Password:   DB_PASSWORD,
+		Database:   DB_DATABASE,
 		MaxRetries: 2,
 	})
 
@@ -40,6 +40,7 @@ func (dispatcher *Dispatcher) dbConnect() error {
 
 	// build the query logger
 	db.OnQueryProcessed(func(event *pg.QueryProcessedEvent) {
+        // XXX : maybe only use UnformattedQuery option ( a debug flag ? )
 		query, err := event.FormattedQuery()
 		if err != nil {
 			panic(err)
@@ -73,86 +74,77 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	log.Println("Get the robot configuration")
 
 	// object to fetch
-	var robots []*models.Robot
+	var machines []*models.Machine
 
 	// get the robot data
 	err := dispatcher.db.
-		Model(&robots).
-		Where(models.TblRobot_Function+" = ?", dispatcher.function).
-		Where(models.TblRobot_Status+" = ?", "ACTIVE").
+		Model(&machines).
+		Where(models.TblMachine_Function+" = ?", dispatcher.function).
+		Where(models.TblMachine_Status+" = ?", "ACTIVE").
 		Select()
 
 	log.Println("1================")
 
 	if err != nil {
-		log.Println("Error while select robots")
+		log.Println("Error while select robots", err)
 		return err
 	}
 
 	log.Println("2================")
 
-	// no elemtns, error
-	if len(robots) == 0 {
-		log.Println("Error no robots definition found")
-		return errors.New("No robots definition found")
+	// no elements, error
+	if len(machines) == 0 {
+		log.Println("Error no machines definition found")
+		return errors.New("No machines definition found")
 	}
 
 	log.Println("3================")
 
-	// store the endpoint to fetch
-	var stepIDs = make(map[string][]int64)
+	// store the endpoint to fetch informations
+	var stepIDs []int64
 
-	log.Println("3.2================")
+	log.Println("4.0================")
 
-	// save into dispatcher definitions data
-	for _, robot := range robots {
+	// store into dispatcher definitions data
+	for _, machine := range machines {
 
-		log.Println("3.3.1.............")
-		log.Printf("%+v", robot)
+		log.Println("4.1.............")
+		log.Printf("%+v", machine)
 
 		// remap by version the definitions
-		dispatcher.robots[robot.Version] = &robot.Definition
+		dispatcher.definitions[machine.Version] = &machine.Definition
 
-		log.Println("3.3.2.............")
+		log.Println("4.2.............")
 
 		// save the step IDs to fetch after
-		for _, step := range robot.Definition.Sequence {
-			stepIDs[step.EndpointType] = append(stepIDs[step.EndpointType], step.EndpointID)
-		}
-	}
-
-	log.Println("4================")
-
-	// fetch the steps data
-	for model, steps := range stepIDs {
-
-		// http case
-		if model == "HTTP" {
-
-			// object to fetch
-			var endpoints []*models.HttpEndpoint
-
-			// get the endpoint data
-			err := dispatcher.db.
-				Model(&endpoints).
-				Where(models.TblHttpEndpoint_Id+" IN ( ? )", pg.In(steps)).
-				Select()
-
-			if err != nil {
-				log.Printf("Error while retrieve endpoints : %s", model)
-				return err
-			}
-
-			// iterate on each endpoints
-			for _, endpoint := range endpoints {
-
-				// save endpoints
-				dispatcher.endpoints[endpoint.Id] = &endpoint
-			}
+		for _, step := range machine.Definition.Sequence {
+			stepIDs = append( stepIDs, step.EndpointID)
 		}
 	}
 
 	log.Println("5================")
+
+    // object to fetch
+    var endpoints []*models.Endpoint
+
+    // get the endpoint data
+    err := dispatcher.db.
+        Model(&endpoints).
+        Where(models.TblEndpoint_Id+" IN ( ? )", pg.In(stepIDs)).
+        Select()
+
+    if err != nil {
+        log.Printf("Error while retrieve endpoints", err)
+        return err
+    }
+
+    // store locally each endpoints
+    for _, endpoint := range endpoints {
+
+        dispatcher.endpoints[ endpoint.Id ] = &endpoint
+    }
+
+	log.Println("6================")
 
 	return nil
 }
