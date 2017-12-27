@@ -305,7 +305,9 @@ func (worker *Worker) DoAction(id int64) error {
     }
 
 
-func onResponseInterval(task *models.Task, response *models.EndpointResponse) error {
+
+
+func (worker *Worker) setInterval(response *models.EndpointResponse, task *models.Task) error {
 
     // interval is defined ?
     if response.Data.Interval == nil || *response.Data.Interval == 0 {
@@ -326,7 +328,41 @@ func onResponseInterval(task *models.Task, response *models.EndpointResponse) er
     return nil
 }
 
-func onResponseStep(task *models.Task, response *models.EndpointResponse) error {
+func (response *models.EndpointResponse) onNextStep(task *models.Task) error {
+
+    // step is defined ?
+    if response.Data.Step == nil || *response.Data.Step == "" {
+        return errors.New("Missing step parameter from API return")
+    }
+
+
+    // flag to know if actual step found or not
+    var found = false
+
+    // retrieve the next step data
+    for _, s := range worker.Definition.Sequence {
+        // actual founded, this one is the classic next step
+        if found {
+            // update the task step
+            task.Step = s.Name
+            break
+        }
+        // this actual step was here, founded
+        if s.Name == task.Step {
+            found = true
+        }
+    }
+
+    // no next step found, error
+    if !found {
+        return errors.New("Impossible to found the next step")
+    }
+
+    // ok
+    return nil
+}
+
+func (response *models.EndpointResponse) onStep(task *models.Task) error {
 
     // step is defined ?
     if response.Data.Step == nil || *respnse.Data.Step == "" {
@@ -360,33 +396,176 @@ func onResponseStep(task *models.Task, response *models.EndpointResponse) error 
 
 
 
-    if response.Action == models.EndpointResponseAction_GOTO
-        || response.Action == models.EndpointResponseAction_GOTO_LATER {
 
-        // interval setting
-        err = onResponseInterval(task, response)
-        if err != nil {
 
-        }
 
-        // step setting
-        err = onResponseStep(task, response)
-        if err != nil {
 
-            var comment = "Impossible to found the asked next step from the API return"
 
-            // update task
-            task.Status = models.TaskStatus_ERROR
-            task.Comment = &comment
 
-            log.Println( comment )
-        }
 
-        task.Status = models.TaskStatus_TODO
 
-        log.Printf("Change the next step to '%s'", askedStep)
+
+
+
+
+    // do the action correctly
+    switch response.Action {
+
+        // GOTO & GOTO_LATER actions
+        case models.EndpointResponseAction_GOTO , models.EndpointResponseAction_GOTO_LATER :
+
+            // only for GOTO_LATER action
+            if response.Action == models.EndpointResponseAction_GOTO_LATER {
+
+                // interval settings
+                // from the response.Data.Interval parameter set the task.TodoDate
+                // if not good return ERROR status & ERROR comment
+                //
+
+            }
+
+            // step settings
+            // from the response.Data.Step parameter set the task.Step
+            // if not good return ERROR status & ERROR comment
+            //
+
+            // if OK
+            // write task.Status = T0D0
+            //
+            //task.Status = models.TaskStatus_TODO
+            //log.Printf("Change the next step to '%s'", askedStep)
+
+        // NEXT & NEXT_LATER actions
+        case models.EndpointResponseAction_NEXT , models.EndpointResponseAction_NEXT_LATER :
+
+            // only for NEXT_LATER action
+            if response.Action == models.EndpointResponseAction_NEXT_LATER {
+
+                // interval settings
+                // from the response.Data.Interval parameter set the task.TodoDate
+                // if not good return ERROR status & ERROR comment
+                //
+
+            }
+
+            // next step settings
+            // found the next step from actual step task.Step
+            // if not good return ERROR status & ERROR comment
+            //
+
+            // if OK
+            // write task.Status = T0D0
+            //
+            //task.Status = models.TaskStatus_TODO
+            //log.Printf("Change the next step to '%s'", askedStep)
+
+        // RETRY_NOW actions
+        case models.EndpointResponseAction_RETRY_NOW :
+
+            // if OK
+            // write task.Status = T0D0
+            //
+            //task.Status = models.TaskStatus_TODO
+            //log.Printf("Change the next step to '%s'", askedStep)
+
+
+        // RETRY actions
+        case models.EndpointResponseAction_RETRY :
+
+            //      interval: int64 in seconds ( default: 60 )  --> optional : only for RETRY action
+            //      no_decrement: bool                          --> optional : only for RETRY action
+
+            // interval settings
+            // from the response.Data.Interval parameter set the task.TodoDate
+            // if not good return ERROR status & ERROR comment
+            //
+
+            // no_decrement settings
+            // from the response.Data.NoDecrement parameter set the task.TodoDate
+            // if not good return ERROR status & ERROR comment
+            //
+
+        // CANCELED actions
+        case models.EndpointResponseAction_CANCELED :
+
+            //      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
+            //      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+
+        // ERROR & PROBLEM actions
+        default :
+
+            //      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
+            //      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
 
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        }
 
     if response.Action == EndpointResponseAction_NEXT {
 
