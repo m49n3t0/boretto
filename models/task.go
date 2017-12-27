@@ -21,7 +21,7 @@ type Task struct {
 	DoneDate     *time.Time             `sql:"done_date"`
 	Arguments    map[string]interface{} `sql:"arguments,notnull"`
 	Buffer       map[string]interface{} `sql:"buffer,notnull"`
-    Comment      *string                 `sql:"comment"`
+    Comment      string                 `sql:"comment"`
 }
 
 const (

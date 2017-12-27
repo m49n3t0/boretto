@@ -21,7 +21,8 @@ create table "task" (
     "todo_date" timestamp with time zone not null default now(),
     "done_date" timestamp with time zone,
     "arguments" jsonb not null default '{}',
-    "buffer" jsonb not null default '{}'
+    "buffer" jsonb not null default '{}',
+    "comment" character varying(255)
 );
 
 create table "endpoint" (

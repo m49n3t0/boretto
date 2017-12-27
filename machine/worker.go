@@ -77,6 +77,24 @@ func (worker *Worker) Stop() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+//
+//  type EndpointResponse struct {
+//      Action  EndpointResponseAction  `json:"action,notnull"`
+//      Buffer  *JsonB                  `json:"buffer"`
+//      Data    *EndpointResponseData   `json:"data"`
+//  }
+//
+//  buffer: interface{},
+//  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
+//  data: {
+//      step: string                                --> optional : only for GOTO/GOTO_LATER action
+//      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
+//      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
+//      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+//      no_decrement: bool                          --> optional : only for RETRY action
+//  },
+//
+
 // do the action for this task with the good action
 func (worker *Worker) DoAction(id int64) error {
 
@@ -176,35 +194,24 @@ func (worker *Worker) DoAction(id int64) error {
 		return err
 	}
 
+    //
+    //  type EndpointResponse struct {
+    //      Action  EndpointResponseAction  `json:"action,notnull"`
+    //      Buffer  *JsonB                  `json:"buffer"`
+    //      Data    *EndpointResponseData   `json:"data"`
+    //  }
+    //
+    //  buffer: interface{},
+    //  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
+    //  data: {
+    //      step: string                                --> optional : only for GOTO/GOTO_LATER action
+    //      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
+    //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
+    //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+    //      no_decrement: bool                          --> optional : only for RETRY action
+    //  },
+    //
 
-
-
-
-
-
-
-
-
-
-
-
-//
-//  type EndpointResponse struct {
-//      Action  EndpointResponseAction  `json:"action,notnull"`
-//      Buffer  *JsonB                  `json:"buffer"`
-//      Data    *EndpointResponseData   `json:"data"`
-//  }
-//
-//  buffer: interface{},
-//  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
-//  data: {
-//      step: string                                --> optional : only for GOTO/GOTO_LATER action
-//      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
-//      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
-//      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
-//      no_decrement: bool                          --> optional : only for RETRY action
-//  },
-//
 	// vars
 	var httpResponse HttpResponse
 	var statusCode int
@@ -257,22 +264,6 @@ func (worker *Worker) DoAction(id int64) error {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     //
     //  type EndpointResponse struct {
     //      Action  EndpointResponseAction  `json:"action,notnull"`
@@ -297,76 +288,145 @@ func (worker *Worker) DoAction(id int64) error {
 
     }
 
+    //        // buffer key update
+    //        task.Buffer = *httpResponse.Buffer
+    //
+    //        // status key update
+    //        task.Status = statusName
+    //
+    //        // last update key update
+    //        timeNow = time.Now()
+    //        task.LastUpdate = &timeNow
+    //
+    //        // retry key update
+    //        task.Retry = task.Retry - 1
+    //
+    //        // comment key update
+    //        if httpResponse.Comment != nil {
+    //
+    //            // retrieve the comment string
+    //            var comment = *httpResponse.Comment // string
+    //
+    //            // change it only if not empty
+    //            if comment != "" {
+    //                task.Comment = comment
+    //            }
+    //        }
+    //
+    //        log.Println("Task updation")
+    //
+    //        log.Println("-~-~-~/endpoint\\~-~-~-")
+    //
+    //        // --------------------------------------------------------------------- //
+    //
+    //        log.Println("42.9----------------------------------------------")
+    //
+    //        log.Println("Task updation")
+    //
+    //        // change the task data
+    //        task.Status = "TODO"
+    //
+    //        // last update key
+    //        task.LastUpdate = time.Now()
+    //
+    //        // fetch the object
+    //        err := dispatcher.db.Update(task)
+    //
+    //        if err != nil {
+    //            log.Println("Error while updating the task result : ", err)
+    //            return err
+    //        }
+    //
+    //        log.Println("42.10----------------------------------------------")
+    //
+    //        log.Println("Task updated")
+    //
+    //        return nil
 
-    if response.Action == EndpointResponseAction_NULL {
 
-        // error , no action give to do
+    // vars for process function response
+    var ( task, mErr ) ( *models.Task, error )
 
+    // do the action correctly
+    switch response.Action {
+
+        // GOTO action
+        case models.EndpointResponseAction_GOTO:
+            task, mErr = worker.processActionGoto( task, definition, response)
+
+        // GOTO_LATER action
+        case models.EndpointResponseAction_GOTO_LATER :
+            task, mErr = worker.processActionGotoLater( task, definition, response)
+
+        // NEXT action
+        case models.EndpointResponseAction_NEXT :
+            task, mErr = worker.processActionNext( task, definition, response)
+
+        // NEXT_LATER action
+        case models.EndpointResponseAction_NEXT_LATER :
+            task, mErr = worker.processActionNextLater( task, definition, response)
+
+        // RETRY_NOW action
+        case models.EndpointResponseAction_RETRY_NOW :
+            task, mErr = worker.processActionRetryNow( task, definition, response)
+
+        // RETRY action
+        case models.EndpointResponseAction_RETRY :
+            task, mErr = worker.processActionRetry( task, definition, response)
+
+        // CANCELED action
+        case models.EndpointResponseAction_CANCELED :
+            task, mErr = worker.processActionCanceled( task, definition, response)
+
+        // PROBLEM action
+        case models.EndpointResponseAction_PROBLEM:
+            task, mErr = worker.processActionProblem( task, definition, response)
+
+        // DEFAULT / ERROR action
+        default :
+            task, mErr = worker.processActionError( task, definition, response)
     }
 
-
-
-
-func (worker *Worker) setInterval(response *models.EndpointResponse, task *models.Task) error {
-
-    // interval is defined ?
-    if response.Data.Interval == nil || *response.Data.Interval == 0 {
-		return errors.New("Missing interval parameter from API return")
-    }
-
-    // correctly setted ?
-    if *response.Data.Interval <= 60 {
-        log.Println("Bad interval from the API return, reset interval to the default 60s")
-
-        *response.Data.Interval = 60
-    }
-
-    // update the task todo date
-    //task.TodoDate = common.dateTools( now() + *response.Data.Interval )
-
-    // ok
-    return nil
+    return worker.updateTask( task, mErr )
 }
 
-func (response *models.EndpointResponse) onNextStep(task *models.Task) error {
+
+// Function to process the GOTO_LATER action
+func (worker *Worker) processActionGotoLater(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+    // interval settings
+    //
+
+    //default
+    var interval = 60
+
+    // interval is correctly defined ?
+    if response.Data.Interval != nil && *response.Data.Interval > 60 {
+        interval = *response.Data.Interval
+    }
+
+    // update the task TodoDate key
+    task.TodoDate = task.TodoDate.Add( time.Duration( interval ) * time.Second )
+
+    // logger
+    log.Println("TodoDate updated to '%s'", task.TodoDate) // task.TodoDate.String()
+
+    // later == retry
+    task.Retry = task.Retry - 1
+
+    return worker.processGoto(task, definition, response)
+}
+
+
+// Function to process the GOTO action
+func (worker *Worker) processActionGoto(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+    // step settings
+    //
 
     // step is defined ?
     if response.Data.Step == nil || *response.Data.Step == "" {
-        return errors.New("Missing step parameter from API return")
-    }
-
-
-    // flag to know if actual step found or not
-    var found = false
-
-    // retrieve the next step data
-    for _, s := range worker.Definition.Sequence {
-        // actual founded, this one is the classic next step
-        if found {
-            // update the task step
-            task.Step = s.Name
-            break
-        }
-        // this actual step was here, founded
-        if s.Name == task.Step {
-            found = true
-        }
-    }
-
-    // no next step found, error
-    if !found {
-        return errors.New("Impossible to found the next step")
-    }
-
-    // ok
-    return nil
-}
-
-func (response *models.EndpointResponse) onStep(task *models.Task) error {
-
-    // step is defined ?
-    if response.Data.Step == nil || *respnse.Data.Step == "" {
-        return errors.New("Missing step parameter from API return")
+        return task, errors.New("Missing step parameter from API response for GOTO actions")
     }
 
     // flag to know if found or not
@@ -383,14 +443,115 @@ func (response *models.EndpointResponse) onStep(task *models.Task) error {
 
     // not found, error
     if !found {
-        return errors.New("Impossible to found the asked step from the API return")
+        return task, errors.New("Impossible to found the asked step from API response")
     }
 
-    // update the task step
+    // setup the new step
     task.Step = *response.Data.Step
 
-    // ok
-    return nil
+    // logger
+    log.Println("Goto step updated to '%s'", task.Step)
+
+    return task, nil
+}
+
+
+// Function to process the NEXT_LATER action
+func (worker *Worker) processActionNextLater(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+    // interval settings default
+    var interval = 60
+
+    // interval is correctly defined ?
+    if response.Data.Interval != nil && *response.Data.Interval > 60 {
+        interval = *response.Data.Interval
+    }
+
+    // update the task TodoDate key
+    task.TodoDate = task.TodoDate.Add( time.Duration( interval ) * time.Second )
+
+    // logger
+    log.Println("TodoDate updated to '%s'", task.TodoDate) // task.TodoDate.String()
+
+    // later == retry
+    task.Retry = task.Retry - 1
+
+    return worker.processNext(task, definition, response)
+}
+
+
+// Function to process the NEXT action
+func (worker *Worker) processActionNext(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+    // next step settings
+    //
+
+    // flag to know if actual step found or not
+    var found = false
+
+    // retrieve the next step data
+    for _, s := range definition.Sequence {
+        // actual founded, this one is the classic next step
+        if found {
+            // setup the new step
+            task.Step = *response.Data.Step
+            task.Status = models.TaskStatus_TODO
+
+            // logger
+            log.Println("Next step updated to '%s'", task.Step)
+
+            return task, nil
+        }
+        // this actual step was here, founded
+        if s.Name == task.Step {
+            found = true
+        }
+    }
+
+    // no next step found, error
+    return nil, errors.New("Impossible to found the next step")
+}
+
+
+// Function to process the RETRY_NOW action
+func (worker *Worker) processActionRetryNow(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+    // step setup
+    task.Status = models.TaskStatus_TODO
+    task.Retry = task.Retry - 1
+
+    return task, nil
+}
+
+
+// Function to process the RETRY action
+func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+    // interval settings default
+    var interval = 60
+
+    // interval is correctly defined ?
+    if response.Data.Interval != nil && *response.Data.Interval > 60 {
+        interval = *response.Data.Interval
+    }
+
+    // update the task TodoDate key
+    task.TodoDate = task.TodoDate.Add( time.Duration( interval ) * time.Second )
+
+    // logger
+    log.Println("TodoDate updated to '%s'", task.TodoDate)
+    //log.Println("TodoDate updated to '%s'", task.TodoDate.String())
+
+    // no_decrement settings
+    //
+
+    // not exists/defined no_decrement flag
+    if response.Data.NoDecrement != nil && response.Data.NoDecrement == false {
+        // later == retry
+        task.Retry = task.Retry - 1
+    }
+
+    return task, nil
 }
 
 
@@ -406,90 +567,29 @@ func (response *models.EndpointResponse) onStep(task *models.Task) error {
 
 
 
-
-
-    // do the action correctly
-    switch response.Action {
-
-        // GOTO & GOTO_LATER actions
-        case models.EndpointResponseAction_GOTO , models.EndpointResponseAction_GOTO_LATER :
-
-            // only for GOTO_LATER action
-            if response.Action == models.EndpointResponseAction_GOTO_LATER {
-
-                // interval settings
-                // from the response.Data.Interval parameter set the task.TodoDate
-                // if not good return ERROR status & ERROR comment
-                //
-
-            }
-
-            // step settings
-            // from the response.Data.Step parameter set the task.Step
-            // if not good return ERROR status & ERROR comment
-            //
-
-            // if OK
-            // write task.Status = T0D0
-            //
-            //task.Status = models.TaskStatus_TODO
-            //log.Printf("Change the next step to '%s'", askedStep)
-
-        // NEXT & NEXT_LATER actions
-        case models.EndpointResponseAction_NEXT , models.EndpointResponseAction_NEXT_LATER :
-
-            // only for NEXT_LATER action
-            if response.Action == models.EndpointResponseAction_NEXT_LATER {
-
-                // interval settings
-                // from the response.Data.Interval parameter set the task.TodoDate
-                // if not good return ERROR status & ERROR comment
-                //
-
-            }
-
-            // next step settings
-            // found the next step from actual step task.Step
-            // if not good return ERROR status & ERROR comment
-            //
-
-            // if OK
-            // write task.Status = T0D0
-            //
-            //task.Status = models.TaskStatus_TODO
-            //log.Printf("Change the next step to '%s'", askedStep)
-
-        // RETRY_NOW actions
-        case models.EndpointResponseAction_RETRY_NOW :
-
-            // if OK
-            // write task.Status = T0D0
-            //
-            //task.Status = models.TaskStatus_TODO
-            //log.Printf("Change the next step to '%s'", askedStep)
-
-
-        // RETRY actions
-        case models.EndpointResponseAction_RETRY :
-
-            //      interval: int64 in seconds ( default: 60 )  --> optional : only for RETRY action
-            //      no_decrement: bool                          --> optional : only for RETRY action
-
-            // interval settings
-            // from the response.Data.Interval parameter set the task.TodoDate
-            // if not good return ERROR status & ERROR comment
-            //
-
-            // no_decrement settings
-            // from the response.Data.NoDecrement parameter set the task.TodoDate
-            // if not good return ERROR status & ERROR comment
-            //
+// Function to process the RETRY action
+func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
         // CANCELED actions
         case models.EndpointResponseAction_CANCELED :
 
             //      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
             //      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+
+// Function to process the RETRY action
+func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+        // ERROR & PROBLEM actions
+        default :
+
+            //      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
+            //      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+
+    }
+
+
+// Function to process the RETRY action
+func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
         // ERROR & PROBLEM actions
         default :
@@ -510,431 +610,26 @@ func (response *models.EndpointResponse) onStep(task *models.Task) error {
 
 
 
+func (worker *Worker) updateTask(task *models.Task, mErr error) error {
 
+    // if callback return an error
+    if mErr != nil {
 
+        // set correct status/comment
+        task.Status = models.TaskStatus_ERROR
+        task.Comment = mErr.Error()
+        task.Retry = task.Retry - 1
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        }
-
-    if response.Action == EndpointResponseAction_NEXT {
-
-        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-        //  200  = next                                                         //
-        //______________________________________________________________________//
-        case 200:
-
-            var statusName = "todo"
-
-            // not an ending step
-            if !actualStep.EndStep {
-
-                var found = false
-
-                // retrieve the next step data
-                for _, s := range worker.Definition.Sequence {
-                    if found {
-                        // set the next step
-                        task.Step = s.Name
-                        break
-                    }
-                    if s.Name == task.Step {
-                        found = true
-                    }
-                }
-
-                // no next step found, error
-                if !found {
-
-                    // error status due to no next step founded
-                    statusName = "error"
-
-                    // forge error comment
-                    var comment = "Impossible to found the next step, maybe a problem in the step sequence"
-
-                    httpResponse.Comment = &comment
-                }
-
-            } else {
-
-                // terminate the task
-                statusName = "done"
-
-                // update the done date
-                var timeNow = time.Now()
-                task.DoneDate = &timeNow
-            }
-
-
-
-        // find the next step, save it and continue
-
+        log.Println(mErr)
     }
 
-
-    if response.Action == EndpointResponseAction_NEXT_LATER {
-
-
-        //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-        //  200  = next                                                         //
-        //______________________________________________________________________//
-        case 200:
-
-            var statusName = "todo"
-
-            // not an ending step
-            if !actualStep.EndStep {
-
-                var found = false
-
-                // retrieve the next step data
-                for _, s := range worker.Definition.Sequence {
-                    if found {
-                        // set the next step
-                        task.Step = s.Name
-                        break
-                    }
-                    if s.Name == task.Step {
-                        found = true
-                    }
-                }
-
-                // no next step found, error
-                if !found {
-
-                    // error status due to no next step founded
-                    statusName = "error"
-
-                    // forge error comment
-                    var comment = "Impossible to found the next step, maybe a problem in the step sequence"
-
-                    httpResponse.Comment = &comment
-                }
-
-            } else {
-
-                // terminate the task
-                statusName = "done"
-
-                // update the done date
-                var timeNow = time.Now()
-                task.DoneDate = &timeNow
-            }
-
-
-        //
-        //  data: {
-        //      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
-        //  },
-        //
-
-    }
-
-    if response.Action == EndpointResponseAction_RETRY {
-
-        //
-        //  data: {
-        //      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
-        //      no_decrement: bool                          --> optional : only for RETRY action
-        //  },
-        //
-
-    }
-
-    if response.Action == EndpointResponseAction_RETRY_NOW {
-
-        //
-
-    }
-
-    if response.Action == EndpointResponseAction_ERROR {
-
-        //
-        //  data: {
-        //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
-        //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field logger
-        //  },
-        //
-
-    }
-
-    if response.Action == EndpointResponseAction_PROBLEM {
-
-        //
-        //  data: {
-        //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
-        //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field logger
-        //  },
-        //
-
-    }
-
-    if response.Action == EndpointResponseAction_CANCELED {
-
-        //
-        //  data: {
-        //      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
-        //      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field logger
-        //  },
-        //
-
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//
-//  type EndpointResponse struct {
-//      Action  EndpointResponseAction  `json:"action,notnull"`
-//      Buffer  *JsonB                  `json:"buffer"`
-//      Data    *EndpointResponseData   `json:"data"`
-//  }
-//
-//  buffer: interface{},
-//  action: ENUM("GOTO","NEXT","GOTO_LATER","NEXT_LATER","RETRY","RETRY_NOW","ERROR","PROBLEM","CANCELED"),
-//  data: {
-//      step: string                                --> optional : only for GOTO/GOTO_LATER action
-//      interval: int64 in seconds ( default: 60 )  --> optional : only for GOTO_LATER/NEXT_LATER/RETRY action
-//      comment: string                             --> optional : only for ERROR/PROBLEM/CANCELED action
-//      detail: map[string]string{}                 --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
-//      no_decrement: bool                          --> optional : only for RETRY action
-//  },
-//
-
-
-
-
-
-
-
-    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-    //  301  = next to '...' step or/and next in '...' interval of seconds  //
-    //______________________________________________________________________//
-    case 301:
-
-        var statusName = "todo"
-
-        // an interval is setup to the next execution laster
-        if httpResponse.Interval != nil {
-
-            // interval send in seconds
-            var interval = *httpResponse.Interval
-
-            // if defined an interval
-            if interval > 0 {
-
-                // compute the todo date with the interval
-                var todoDate = *task.TodoDate
-                var newTodoDate = todoDate.Add(time.Duration(interval) * time.Second)
-
-                task.TodoDate = &newTodoDate
-
-                // logger
-                log.Println("Change the todoDate to '" + newTodoDate.String() + "'")
-            }
-        }
-
-        // a next step definition
-        if httpResponse.Step != nil {
-
-            // new step name
-            var stepName = *httpResponse.Step
-
-            // flag founded
-            var found = false
-
-            // new step exists in the sequence
-            for _, s := range worker.Definition.Sequence {
-                // found the asked overwritted step
-                if s.Name == stepName {
-                    found = true
-                    break
-                }
-            }
-
-            // step founded in the sequence
-            if found {
-
-                // overwrite the step
-                task.Step = stepName
-
-                // logger
-                log.Println("Change the next step to '" + stepName + "'")
-
-            } else {
-
-                // error while the overwriting of the next step
-                statusName = "error"
-
-                // forge error comment
-                var comment = "Impossible to found the next step, maybe the overwrite step name doesn't exists"
-
-                // logger
-                log.Println(comment)
-
-                httpResponse.Comment = &comment
-            }
-        }
-
-    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-    //  420  = cancelled                                                    //
-    //______________________________________________________________________//
-    case 420:
-
-        var statusName = "todo"
-
-        // Setup the status
-        statusName = "cancelled"
-
-    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-    //  520  = problem                                                      //
-    //______________________________________________________________________//
-    case 520:
-
-        var statusName = "todo"
-
-        // Setup the status
-        statusName = "problem"
-
-    //‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾//
-    // other = error ( 5XX : auto-retry )                                   //
-    //______________________________________________________________________//
-    default:
-
-        var statusName = "todo"
-
-        // Error process
-        statusName = "error"
-
-        // Exception for 5XX status code, auto retry if possible
-        if ((statusCode / 100) == 5) && (task.Retry > 1) {
-            statusName = "todo"
-        }
-
-
-	// buffer key update
-	task.Buffer = *httpResponse.Buffer
-
-	// status key update
-	task.Status = statusName
-
-	// last update key update
-	timeNow = time.Now()
-	task.LastUpdate = &timeNow
-
-	// retry key update
-	task.Retry = task.Retry - 1
-
-	// comment key update
-	if httpResponse.Comment != nil {
-
-		// retrieve the comment string
-		var comment = *httpResponse.Comment // string
-
-		// change it only if not empty
-		if comment != "" {
-			task.Comment = comment
-		}
-	}
-
-	log.Println("Task updation")
-
-
-
-
-
-
-	log.Println("-~-~-~/endpoint\\~-~-~-")
-
-	// --------------------------------------------------------------------- //
-
-	log.Println("42.9----------------------------------------------")
-
-	log.Println("Task updation")
-
-	// change the task data
-	task.Status = "TODO"
-
-	// last update key
+    // last update date key
 	task.LastUpdate = time.Now()
 
-	// fetch the object
-	err := dispatcher.db.Update(task)
-
+	// update the database object
+    err := dispatcher.db.Update(task)
 	if err != nil {
-		log.Println("Error while updating the task result : ", err)
+		log.Printf("Error while updating the task result : %s", err)
 		return err
 	}
 
@@ -945,7 +640,23 @@ func (response *models.EndpointResponse) onStep(task *models.Task) error {
 	return nil
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
+
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
