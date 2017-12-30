@@ -1,9 +1,9 @@
 package models
 
 import (
-	"time"
-	"fmt"
 	"database/sql/driver"
+	"fmt"
+	"time"
 )
 
 // Task is the go counterpart of table task
@@ -103,4 +103,3 @@ const (
 )
 
 ///////////////////////////////////////////////////////////////////////////////
-

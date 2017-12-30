@@ -1,18 +1,18 @@
 package models
 
 import (
-	"time"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // Robot is the go counterpart of table robot
 type Robot struct {
 	TableName struct{} `sql:"robot"`
 
-	ID           int64      `sql:"id"`
+	ID           string     `sql:"id"`
 	Function     string     `sql:"function,notnull"`
 	Version      int64      `sql:"version,notnull"`
 	Status       bool       `sql:"status,notnull"`
@@ -45,7 +45,7 @@ const (
 
 type Step struct {
 	Name       string `json:"name"`
-	EndpointID int64  `json:"endpoint_id"`
+	EndpointID string `json:"endpoint_id"`
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -94,4 +94,3 @@ func (e Definition) Value() (driver.Value, error) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-

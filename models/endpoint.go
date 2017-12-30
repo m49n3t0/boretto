@@ -8,7 +8,7 @@ import (
 type Endpoint struct {
 	TableName struct{} `sql:"endpoint"`
 
-	ID           int64     `sql:"id"`
+	ID           string    `sql:"id"`
 	Version      int64     `sql:"version,notnull"`
 	Name         string    `sql:"name,notnull"`
 	Method       string    `sql:"method,notnull"`
@@ -38,4 +38,3 @@ const (
 )
 
 ///////////////////////////////////////////////////////////////////////////////
-

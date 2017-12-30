@@ -743,26 +743,6 @@ func (w Worker) CallHttp(task Task, step Step) (httpResponse HttpResponse, statu
 
 
 
-type WorkerHttpOutput struct {
-    ID          int64               `json:"id"`
-    Context     string              `json:"context"`
-    Arguments   models.JsonB        `json:"arguments"`
-    Buffer      models.JsonB        `json:"buffer"`
-}
-
-type WorkerHttpInput struct {
-	Action models.Action            `json:"action,notnull"`
-	Buffer *models.JsonB            `json:"buffer"`
-	Data   *WorkerHttpInputData     `json:"data"`
-}
-
-type WorkerHttpInputData struct {
-	Step        *string             `json:"step"`
-	Interval    *int64              `json:"interval"`
-	Comment     *string             `json:"comment"`
-	NoDecrement *bool               `json:"no_decrement"`
-}
-
 func (w Worker) CallHttp(task Task, step Step) (httpResponse HttpResponse, statusCode int, err error) {
 
 	// initialize the http client
