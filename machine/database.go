@@ -1,12 +1,13 @@
-package bot
+package machine
 
 import (
 	"encoding/json"
 	"errors"
 	"github.com/go-pg/pg"
 	"github.com/m49n3t0/boretto/models"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 ///////////////////////////////////////////////////////////////////////////////

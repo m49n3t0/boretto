@@ -1,19 +1,17 @@
 package models
 
-import (
-	"database/sql"
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
-)
-
-
-type EndpointResponse struct {
-    Action  EndpointResponseAction `json:"action,notnull"`
-    Buffer *JsonB `json:"buffer"`
-    Data *EndpointResponseData `json:"data"`
-}
-
+//import (
+//	"database/sql"
+//	"database/sql/driver"
+//	"encoding/json"
+//	"fmt"
+//)
+//
+//type EndpointResponse struct {
+//	Action EndpointResponseAction `json:"action,notnull"`
+//	Buffer *JsonB                 `json:"buffer"`
+//	Data   *EndpointResponseData  `json:"data"`
+//}
 
 //var (
 //	_ sql.Scanner   = &EndpointResponse{}

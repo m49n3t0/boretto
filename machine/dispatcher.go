@@ -1,15 +1,15 @@
-package bot
+package machine
 
 import (
-	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 
 	"github.com/go-pg/pg"
-
 	"github.com/m49n3t0/boretto/models"
+
+	log "github.com/sirupsen/logrus"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -111,25 +111,25 @@ func (dispatcher *Dispatcher) launch() {
 
 	for {
 		select {
-            case taskId := <-dispatcher.queue:
+		case taskId := <-dispatcher.queue:
 
-                log.Printf("Dispatch to taskChannel with ID: %d\n", taskId)
+			log.Printf("Dispatch to taskChannel with ID: %d\n", taskId)
 
-                // try to obtain a worker task channel that is available.
-                // this will block until a worker is idle
-                taskChannel := <-dispatcher.workerPool
+			// try to obtain a worker task channel that is available.
+			// this will block until a worker is idle
+			taskChannel := <-dispatcher.workerPool
 
-                // dispatch the task to the worker task channel
-                taskChannel <- taskId
+			// dispatch the task to the worker task channel
+			taskChannel <- taskId
 
-            case <-dispatcher.quit:
+		case <-dispatcher.quit:
 
-                // we have received a signal to stop
-                log.Println("RECEIVE QUIT")
+			// we have received a signal to stop
+			log.Println("RECEIVE QUIT")
 
-                // XXX : how to stop workers correctly
+			// XXX : how to stop workers correctly
 
-                os.Exit(1)
+			os.Exit(1)
 		}
 	}
 }

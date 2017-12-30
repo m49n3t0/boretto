@@ -1,22 +1,20 @@
 package models
 
-import (
-	"database/sql"
-	"database/sql/driver"
-	"encoding/json"
-	"fmt"
-)
-
-
-type EndpointResponseData struct {
-    Step *string `json:"step"`
-    Interval *int64 `json:"interval"`
-    Comment *string `json:"comment"`
-    Detail map[string]string `json:"detail"`
-    NoDecrement *bool `json:"no_decrement"`
-}
-
-
+//import (
+//	"database/sql"
+//	"database/sql/driver"
+//	"encoding/json"
+//	"fmt"
+//)
+//
+//type EndpointResponseData struct {
+//	Step        *string           `json:"step"`
+//	Interval    *int64            `json:"interval"`
+//	Comment     *string           `json:"comment"`
+//	Detail      map[string]string `json:"detail"`
+//	NoDecrement *bool             `json:"no_decrement"`
+//}
+//
 //var (
 //	_ sql.Scanner   = &EndpointResponseData{}
 //	_ driver.Valuer = EndpointResponseData{}
