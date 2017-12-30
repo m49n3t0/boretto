@@ -92,8 +92,9 @@ func (e TaskStatus) Value() (driver.Value, error) {
 }
 
 const (
-	TaskStatus_NULL     TaskStatus = ""
 	TaskStatus_MISTAKE  TaskStatus = "MISTAKE"
+	TaskStatus_FAULT    TaskStatus = "FAULT"
+	TaskStatus_NULL     TaskStatus = ""
 	TaskStatus_TODO     TaskStatus = "TODO"
 	TaskStatus_DOING    TaskStatus = "DOING"
 	TaskStatus_ERROR    TaskStatus = "ERROR"

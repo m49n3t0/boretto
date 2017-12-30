@@ -149,6 +149,113 @@ func (dispatcher *Dispatcher) getConfiguration() error {
 	return nil
 }
 
+// retrieve the available task ID list
+func (dispatcher *Dispatcher) getTasks() error {
+
+	log.Println("Read all task IDs")
+
+	// where store the ID list
+	var IDs []int64
+
+	log.Println("9.0=========================")
+
+	// working on this model
+	var task models.Task
+
+	// fetch the available ID list
+	err := dispatcher.db.
+		Model(&task).
+		Column("id").
+		OrderExpr(models.TblTask_Id+" ASC").
+		Where(models.TblTask_Status+" = ?", "TODO").
+		Where(models.TblTask_Function+" = ?", dispatcher.function).
+		Where(models.TblTask_Retry+" > ?", 0).
+		Where(models.TblTask_TodoDate + " <= NOW()").
+		Select(&IDs)
+
+	log.Println("9.1=========================")
+
+	if err != nil {
+		log.Println("Error while fetching the task ids")
+		log.Println(err)
+		return err
+	}
+
+	log.Println("9.2=========================")
+
+	log.Println("All rows:")
+
+	for x, id := range IDs {
+
+		dispatcher.queue <- id
+
+		log.Printf("9.3=====>  %d : %+v\n", x, id)
+	}
+
+	return nil
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //// retrieve the available task ID list
 //func (dispatcher *Dispatcher) getTaskIDs() error {
 //

@@ -1,0 +1,475 @@
+/*
+Package ultron is a wrapper to easily implement and run golang robots.
+
+It provides a healthcheck service for marathon to monitor the robot,
+and it allows to run the robot on demand or periodically.
+
+In order to run a robot using ultron, declare a struct that implements the
+ultron.Robot interface.
+
+	type Robot interface {
+		// Initialize is called once at startup for initialization.
+		Initialize() error
+		// Run performs the task of the robot.
+		Run() error
+		// Healthcheck reports the health of the robot, nil response meaning good health.
+		HealthCheck() error
+		// Terminate is called when marathon wants to shutdown the container (upon receiving SIGTERM signal).
+		// Use this function to gracefully stop as many things as possible.
+		// Soon after call to Terminate, the container will be killed.
+		Terminate()
+	}
+
+Then, define a main function that bootstraps ultron with your robot.
+
+	type MyRobot struct {} // Implements ultron.Robot interface.
+
+	func main() {
+		r := &MyRobot{}
+		// Configure takes the robot, the robot name and its description.
+		ultron.Run(r, "myrobot", "myrobot is a robot managed by ultron")
+	}
+
+Use the init function to customize cmdline flags.
+Use namsral/flag package to get automatic flags binding to environment variables.
+
+	import "github.com/namsral/flag"
+
+	var str string
+	var i int
+
+	func init() {
+		// Initialize cmdline flags for your robot.
+		flag.StringVar(&str, "mystr", "", "A string")
+		flag.IntVar(&i, "myint", 42, "As integer")
+	}
+*/
+package ultron
+
+package ultron
+
+import "stash.ovh.net/golang/logrus"
+
+// Robot is a robot that is managed by ultron.
+type Robot interface {
+	// Initialize is called once at startup for initialization.
+	Initialize(*logrus.Entry) error
+	// Run performs the task of the robot.
+	Run(*logrus.Entry) error
+	// Healthcheck reports the health of the robot, nil response meaning good health.
+	HealthCheck(*logrus.Entry) error
+	// Terminate is called when marathon wants to shutdown the container (upon receiving SIGTERM signal).
+	// Use this function to gracefully stop as many things as possible.
+	// Soon after call to Terminate, the container will be killed.
+	Terminate(*logrus.Entry)
+}
+
+
+
+package ultron
+
+import (
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	"github.com/namsral/flag"
+	"github.com/ovhlabs/functions/go-sdk/event"
+	"github.com/satori/go.uuid"
+
+	"stash.ovh.net/golang/logrus"
+	ovhlogrus "stash.ovh.net/golang/logrus/ovh"
+	"stash.ovh.net/golang/ultron/lib/parallel"
+	"stash.ovh.net/golang/ultron/secret"
+	"stash.ovh.net/uservice/public/vaultlib/go/autovault"
+)
+
+var (
+	// logger is a logger entry.
+	logger *logrus.Entry
+	// port is the port healthcheck API listens on.
+	port int
+	// tick contains the ticking interval (as a golang duration).
+	tick string
+	// tickDay contains the day of the month to run the program.
+	tickDay int
+	// tickHour contains the hour of the day to run the program.
+	tickHour int
+	// wait flag prevents ultrom from terminating After running the robot once.
+	wait bool
+	// logjson flag to log using JSON formatting (defaults to plaintext).
+	logjson bool
+	// loglevel defined the logging level [debug, info, warn(ing), error, fatal, panic].
+	loglevel string
+	// logcolor flag to enable colors when logging in plaintext.
+	logcolor bool
+	// logthot flag to enable logging to thot.
+	logthot bool
+	// environment contains the value of environment variable ENVIRONMENT.
+	environment string
+	// conf contains configuration from ovhconfiguration.
+	conf map[string]string
+	// confInit is true when ovhconfiguration has been loaded.
+	confInit bool
+	// robotName is the name of the robot.
+	robotName string
+	// robotDescription is the description of the robot.
+	robotDescription string
+	// vaultThotKey is the vault key which contains thot token.
+	vaultThotKey string
+	// lastRun is the date of the last run.
+	lastRun time.Time
+	// runNumber is the number of the current run.
+	runNumber = 1
+	// numberThread is the number of go routine used to run parallels functions.
+	numberThread int
+	// chanBuffer is the size of the buffer of input parallel functions.
+	chanBuffer int
+	// workers contains the parallel object which handle parallelization.
+	workers *parallel.Parallel
+	// initialized is true when robot has successfully terminated initialization.
+	initialized bool
+	// continent is the continent where robot is running.
+	continent string
+	// availableContinents is the list of continents the robot can communicate with.
+	availableContinents = stringSlice{"fr", "ca"}
+	// stopChans contains chanels to signal robot termination.
+	stopChans []chan struct{}
+	// doneChans contains chanels to signal root that robot is ready to terminate.
+	doneChans []chan struct{}
+	// disableHealthcheck disables healthcheck plugins.
+	disableHealthcheck bool
+	// forceStart disables healthcheck at initialization.
+	forceStart bool
+	// runErr is error returned by robot Run function.
+	runErr error
+	// blocker permits to terminate the robot.
+	blocker chan struct{}
+	// robotFunction is the instance of the robot to re-use for ovh-function.
+	robotFunction Robot
+)
+
+// GetLogger returns the logger that should be used by the robot.
+//
+// This logger is configured to log to thot when THOT_ENABLED environment
+// variable is set and THOT_TOKEN_ID contains graylog stream ID.
+func GetLogger() *logrus.Entry {
+	return logger
+}
+
+// WithField is a helper to add a field to ultron's logger.
+// It returns the logger.
+func WithField(key string, value interface{}) *logrus.Entry {
+	logger = logger.WithField(key, value)
+	return logger
+}
+
+// WithFields is a helper to add several fields to ultron's logger.
+// It returns the logger.
+func WithFields(fields logrus.Fields) *logrus.Entry {
+	logger = logger.WithFields(fields)
+	return logger
+}
+
+// GetSecret fetches a secret from vault.
+func GetSecret(key string) (string, error) {
+	return autovault.Secrets().Alias(strings.ToLower(key))
+}
+
+// init initializes ultron flags.
+func init() {
+	// API listening port.
+	flag.IntVar(&port, "ultron-port", 12911, "Listening port of the API. If value is 0, API is not started")
+
+	// Tick flag to start robot periodically.
+	flag.StringVar(&tick, "ultron-tick", "", "Tick interval (e.g. 30s, 10m, 3h)")
+
+	// Run program only once a month on the selected day
+	flag.IntVar(&tickDay, "ultron-repeat-day", 0, "Day of the month to run program")
+
+	// Run program once a day on the selected hour. Can be combined with ultron-repeat-day
+	flag.IntVar(&tickHour, "ultron-repeat-hour", -1, "Hour of the day to run program")
+
+	// Wait flag prevents ultrom from terminating After running the robot once.
+	flag.BoolVar(&wait, "ultron-wait", false, "Do not exit when robot run is finished (non-tick only).")
+
+	// Flag to log using JSON format, defaults to plaintext.
+	flag.BoolVar(&logjson, "ultron-logjson", false, "Log using JSON format")
+
+	// Flag to set logging level, defaults to debug on dev environment, info otherwise.
+	flag.StringVar(&loglevel, "ultron-loglevel", "", "Logging level [debug, info, warn(ing), error, fatal, panic]")
+
+	// Flag to enable logging colors, default is to disable colors.
+	flag.BoolVar(&logcolor, "ultron-logcolor", false, "Enable logging colors")
+
+	// Flag to enable logging to thot, default is to don't send log to thot.
+	flag.BoolVar(&logthot, "thot-enabled", false, "Enable to send log to thot")
+
+	// Flag to set vault key to fetch thot token.
+	flag.StringVar(&vaultThotKey, "ultron-vault-thot-key", "robot.thot.token", "Key of the secret in vault which contains thot token")
+
+	// Flag to disable plugins healthcheck.
+	flag.BoolVar(&disableHealthcheck, "ultron-disable-plugin-healthcheck", false, "Only run healthcheck at init for plugins")
+
+	// Flag to disable plugins healthcheck.
+	flag.BoolVar(&forceStart, "ultron-force-start", false, "Don't call healthcheck at initialization, start event if any backend is down")
+
+	// Flag to set environment.
+	flag.StringVar(&environment, "environment", "", "Environment")
+
+	// Flag to set number thread to run parallels functions.
+	flag.IntVar(&numberThread, "ultron-parallels", 10, "Number of go routine to open, 0 to disable")
+
+	// Flag to set the channel buffer size for parallels input functions.
+	flag.IntVar(&chanBuffer, "ultron-parallels-buffer", 100, "Buffer size of channel used to parallelize")
+
+	// Flag to set the continent where the robot is running
+	flag.StringVar(&continent, "ultron-continent", "FR", "Continent where robot is running (eg: fr)")
+
+	// Flag to set the list of continents the robot can communicate with.
+	flag.Var(&availableContinents, "ultron-available-continents", "Available continents to communicate with (eg: fr,ca)")
+
+	// Define custom usage func.
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, `%s (powered by ultron)
+
+Description:
+
+	%s
+
+Ultron:
+
+	Robot powered by ultron can be started once (default behavior)
+	or periodically by providing a duration through -ultron-tick flag.
+
+	All flags are bound to environment variables (uppercased, - converted to _).
+	For example -ultron-tick is bound to ULTRON_TICK environment variable.
+
+	All ultron-specific flags are prefixed by ultron (except environment).
+
+	Ultron provides a healthcheck API to monitor robot. It listens on port
+	12911 by default and exposes route /health.
+
+Example:
+
+	# Run robot every minute
+	./%s -ultron-tick 1m
+	ULTRON_TICK=1m ./%s
+
+Flags:
+
+`, robotName, robotDescription, robotName, robotName)
+
+		flag.PrintDefaults()
+	}
+}
+
+// initLogger initializes the logger.
+func initLogger(name string) error {
+
+	if IsSdev() {
+		// We are on sdev, set level to debug by default.
+		loglevel = "debug"
+	}
+	// Otherwise logging level defaults to info.
+
+	// Configure thot hook.
+	// If THOT_TOKEN environment variable is set, there is nothing else to do since ovhlogrus reads this variable.
+	// Otherwise, we read data from vault and set environment variable values accordingly.
+	thotFromEnv := os.Getenv(ovhlogrus.ThotTokenEnv)
+
+	// Force env THOT_ENABLED if logthot is true to let ovhlogrus initialize thot
+	if logthot {
+		os.Setenv(ovhlogrus.ThotLoggingEnv, "1")
+	}
+
+	if logthot && thotFromEnv == "" {
+
+		if thotToken, err := secret.GetThotToken(); err == nil {
+			os.Setenv(ovhlogrus.ThotTokenEnv, thotToken.Value)
+		} else {
+			logrus.WithError(err).Warn("logging to thot is enabled but a key is missing")
+			return fmt.Errorf("fail to get thot token from vault")
+		}
+	}
+
+	// Log using JSON format if required.
+	if logjson {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		logrus.SetFormatter(&logrus.TextFormatter{DisableColors: !logcolor})
+	}
+
+	// Set logging level.
+	if loglevel != "" {
+		lvl, err := logrus.ParseLevel(loglevel)
+		if err != nil {
+			logrus.WithError(err).Error("invalid logrus level")
+		} else {
+			logrus.SetLevel(lvl)
+			// Set env var to config thot hook
+			os.Setenv(ovhlogrus.ThotThresholdEnv, loglevel)
+		}
+	}
+
+	logger = logrus.NewEntry(logrus.StandardLogger())
+
+	if environment != "" {
+		WithField("environment", environment)
+	}
+
+	WithField("mesos_task_id", os.Getenv("MESOS_TASK_ID"))
+	WithField("function", name)
+	// Initialize ovh logrus (configures thot hook).
+	ovhlogrus.InitLogger("ultron")
+	logrus.SetOutput(os.Stdout)
+
+	return nil
+}
+
+// RunFunction permits to run the main function with initialization if needed.
+func RunFunction(robot Robot, name string, event event.Event) error {
+	// TODO : to remove when ovh-functions fix the os.Stdout reset
+	logrus.SetOutput(ioutil.Discard)
+
+	// Add event params in flags
+	flag.VisitAll(func(f *flag.Flag) {
+		if value, ok := event.Params[f.Name]; ok {
+			f.Value.Set(value)
+		}
+	})
+
+	if !initialized {
+		registerRobot(robot, name, "")
+		l := GetLogger()
+		err := robot.Initialize(l.WithField("ultron_step", "initialize"))
+		if err != nil {
+			return err
+		}
+		initialized = true
+		robotFunction = robot
+	} else {
+		// Parse flag to get function params in flags
+		flag.Parse()
+	}
+	err := doRun(robotFunction)
+	logrus.Flush()
+	return err
+}
+
+func registerRobot(robot Robot, name, description string) {
+	robotName = name
+	robotDescription = description
+	if !flag.Parsed() {
+		flag.Parse()
+	} else {
+		logrus.Warn("flag.Parse() should only be called by ultron")
+	}
+
+	// Initialize logger
+	if err := initLogger(name); err != nil {
+		logrus.WithError(err).Fatal("logger init error")
+	}
+
+	l := GetLogger()
+
+	// Check if vault is filled, for debuging purpose.
+	if appKey, filled := os.LookupEnv("VAULT_APP_KEY"); !filled {
+		l.Warn("autovault is not filled")
+	} else if appKey == "" {
+		l.Warn("empty vault app key")
+	} else {
+		l.Info("autovault is filled")
+	}
+}
+
+
+package ultron
+
+import (
+	"errors"
+
+	"github.com/satori/go.uuid"
+	"stash.ovh.net/golang/logrus"
+)
+
+// Plugin is a robot plugin.
+//
+// A plugin provides extra features to ultron, such as database initialization for example.
+type Plugin interface {
+	// GetName returns the name of the plugin. Used for logging purpose.
+	GetName() string
+	// Initialize is called once at startup for initialization.
+	Initialize(*logrus.Entry) error
+	// Terminate is called when the robot terminates.
+	Terminate(*logrus.Entry)
+	// Healthcheck reports the health of the plugin, nil response meaning good health.
+	HealthCheck(*logrus.Entry) error
+}
+
+var (
+	// plugins contains an array of registered plugins.
+	plugins    []Plugin
+	pluginsMap map[string]Plugin
+
+	// ErrPluginAlreadyRegistered error returned when trying to register plugin twice.
+	ErrPluginAlreadyRegistered = errors.New("plugin already registered, use GetPlugin to get the instance")
+
+	// ErrPluginNotInitialized error returned when trying to get not registered plugin.
+	ErrPluginNotInitialized = errors.New("plugin not initialized")
+)
+
+func init() {
+	pluginsMap = make(map[string]Plugin)
+}
+
+// RegisterPlugin registers a new plugin into ultron.
+// The plugin is initializes straight away.
+// A faulty healthcheck is registered if plugin initialization fails.
+func RegisterPlugin(plugin Plugin) error {
+	l := GetLogger().WithField("plugin", plugin.GetName())
+	if _, ok := pluginsMap[plugin.GetName()]; ok {
+		return ErrPluginAlreadyRegistered
+	}
+	l.Info("register plugin")
+	if err := plugin.Initialize(l.WithFields(logrus.Fields{
+		"ultron_step": "initialize",
+		"prefix":      uuid.NewV4().String(),
+	})); err != nil {
+		l.WithError(err).Error("fail to initialize plugin")
+		return err
+	}
+
+	plugins = append(plugins, plugin)
+	pluginsMap[plugin.GetName()] = plugin
+	if initialized {
+		l.Warn("robot already initialized, ultron doesn't register healthcheck")
+		return nil
+	}
+	RegisterHealthCheck(func(l *logrus.Entry) error {
+		return plugin.HealthCheck(l)
+	})
+	return nil
+}
+
+func GetPlugin(id string) (Plugin, error) {
+	if p, ok := pluginsMap[id]; ok {
+		return p, nil
+	}
+	return nil, ErrPluginNotInitialized
+}
+
+// doTerminate terminates all plugins, last registered first.
+func doTerminatePlugins(l *logrus.Entry) {
+	last := len(plugins) - 1
+	for i := range plugins {
+		plugins[last-i].Terminate(l)
+	}
+}
+sthomas@sthomas:~/go/src/stash.ovh.net/golang/ultron$ 
+

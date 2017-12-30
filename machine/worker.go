@@ -163,8 +163,8 @@ func (worker *Worker) DoAction(id int64) error {
 	// --------------------------------------------------------------------- //
 
     // vars for process function response
-    var ( task, mErr ) ( *models.Task, error )
-    var ( task, mErr ) ( *models.Task, error )
+    var task *models.Task
+    var mErr error
 
     // update the local buffer from the API return
     if response.Buffer != nil {
@@ -252,702 +252,301 @@ func (worker *Worker) updateTask(task *models.Task, mErr error) error {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-func (worker *Worker) CallHttp(task *models.Task, endpoint *models.Endpoint) (error, error) {
 
-	// initialize the http client
-	httpclient := http.Client{}
 
-	//	// http call data
-	//	var dataOut = HttpOut{
-	//		Name:      task.Name,
-	//		Arguments: task.Arguments,
-	//		Buffer:    task.Buffer}
-	//
-	//	// encode the http call data
-	//	jsonValue, err := json.Marshal(dataOut)
-	//
-	//	if err != nil {
-	//		log.Fatalln("Error while encode the http call data", err)
-	//
-	//		return httpResponse, statusCode, err
-	//	}
 
-	body := &bytes.Buffer{}
 
-	//	if e.Body != "" {
-	//		body = bytes.NewBuffer([]byte(e.Body))
-	//	}
-	//	if len(e.BasicAuthUser) > 0 || len(e.BasicAuthPassword) > 0 {
-	//	    req.SetBasicAuth(e.BasicAuthUser, e.BasicAuthPassword)
-	//	}
-	//	return req, err
-	//}
 
-	var endpoint *models.HttpEndpoint
 
-	// create the http request
-	req, err := http.NewRequest(endpoint.Method, endpoint.Url, body) //  bytes.NewBuffer(jsonValue))
 
-	if err != nil {
-		log.Fatalln("Error while create the http resquest", err)
-		//	return httpResponse, statusCode, err
-		return nil, nil
-	}
 
-	//	// set some headers
-	//	req.Header.Set("Content-Type", "application/json")
-	//	req.Header.Set("X-Custom-Header", "my-custom-header")
 
-	//
-	//	for k, v := range t.Headers {
-	//		req.Header.Set(k, v)
-	//	}
-	//
-	//    tr := &http.Transport{
-	//        TLSClientConfig: &tls.Config{InsecureSkipVerify: t.IgnoreVerifySSL},
-	//    }
-	//    client := &http.Client{Transport: tr}
-	//
-	//	start := time.Now()
-	//	resp, err := client.Do(req)
-	//	if err != nil {
-	//		return nil, err
-	//	}
+func (worker Worker) CallHttp(task *models.Task, endpoint *models.Endpoint) (*models.ApiResponse, error) {
 
-	// do the http call
-	resp, err := httpclient.Do(req)
-
-	if err != nil {
-		log.Println("Error while do the http call", err)
-		//return httpResponse, statusCode, err
-		return nil, nil
-	}
-
-	//	var bb []byte
-	//	if resp.Body != nil {
-	//		defer resp.Body.Close()
-	//		var errr error
-	//		bb, errr = ioutil.ReadAll(resp.Body)
-	//		if errr != nil {
-	//			return nil, errr
-	//		}
-	//		r.Body = string(bb)
-	//
-	//		bodyJSONArray := []interface{}{}
-	//		if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
-	//			bodyJSONMap := map[string]interface{}{}
-	//			if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
-	//				r.BodyJSON = bodyJSONMap
-	//			}
-	//		} else {
-	//			r.BodyJSON = bodyJSONArray
-	//		}
-	//	}
-	//
-	//	r.StatusCode = resp.StatusCode
-
-	defer resp.Body.Close()
-
-	// read the response body
-	iobody, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		log.Println("Error while read the http body data", err)
-		//return httpResponse, statusCode, err
-		return nil, nil
-	}
-
-	log.Println("===============================")
-	//	log.Printf("Post data request was '%s'\n", string(jsonValue))
-	log.Println("Response StatusCode:", resp.StatusCode)
-	log.Println("Response Headers:", resp.Header)
-	log.Println("Response Body:", string(iobody))
-	log.Println("-------------------------------")
-
-	//	// decoding the returned body data
-	//	err = json.Unmarshal(body, &httpResponse)
-	//
-	//	if err != nil {
-	//		log.Fatalln("Error while decoding the http response body", err)
-	//
-	//		return httpResponse, statusCode, err
-	//	}
-	//
-	//	// retrieve the statusCode data
-	//	statusCode = resp.StatusCode
-	//
-	//	log.Println("Http call work fine")
-	//
-	//	return httpResponse, statusCode, nil
-
-	return nil, nil
-}
-
-func (w Worker) CallHttp(task Task, step Step) (httpResponse HttpResponse, statusCode int, err error) {
-
-	// initialize the http client
-	httpclient := http.Client{}
-
-	// http call data
-	var dataOut = HttpOut{
-		Name:      task.Name,
-		Arguments: task.Arguments,
-		Buffer:    task.Buffer}
-
-	// encode the http call data
-	jsonValue, err := json.Marshal(dataOut)
-
-	if err != nil {
-		log.Fatalln("Error while encode the http call data", err)
-
-		return httpResponse, statusCode, err
-	}
-
-	// create the http request
-	req, err := http.NewRequest("POST", step.Url, bytes.NewBuffer(jsonValue))
-
-	if err != nil {
-		log.Fatalln("Error while create the http resquest", err)
-
-		return httpResponse, statusCode, err
-	}
-
-
-	path := fmt.Sprintf("%s%s", e.URL, e.Path)
-	method := e.Method
-	body := &bytes.Buffer{}
-
-	if e.Body != "" {
-		body = bytes.NewBuffer([]byte(e.Body))
-	}
-
-	req, err := http.NewRequest(method, path, body)
-	if err != nil {
-		return nil, err
-	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	// set some headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Custom-Header", "my-custom-header")
-
-
-	if len(e.BasicAuthUser) > 0 || len(e.BasicAuthPassword) > 0 {
-	    req.SetBasicAuth(e.BasicAuthUser, e.BasicAuthPassword)
-	}
-
-	for k, v := range t.Headers {
-		req.Header.Set(k, v)
-	}
-
-
-
-
-	// do the http call
-	resp, err := httpclient.Do(req)
-
-	if err != nil {
-		log.Fatalln("Error while do the http call", err)
-
-		return httpResponse, statusCode, err
-	}
-
-	defer resp.Body.Close()
-
-
-    tr := &http.Transport{
-        TLSClientConfig: &tls.Config{InsecureSkipVerify: t.IgnoreVerifySSL},
-    }
-    client := &http.Client{Transport: tr}
-
-	start := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	elapsed := time.Since(start)
-	r.TimeSeconds = elapsed.Seconds()
-	r.TimeHuman = fmt.Sprintf("%s", elapsed)
-
-
-
-
-
-
-
-
-
-
-	// read the response body
-	body, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		log.Fatalln("Error while read the http body data", err)
-
-		return httpResponse, statusCode, err
-	}
-
-	log.Println("===============================")
-	log.Printf("Post data request was '%s'\n", string(jsonValue))
-	log.Println("Response StatusCode:", resp.StatusCode)
-	log.Println("Response Headers:", resp.Header)
-	log.Println("Response Body:", string(body))
-	log.Println("-------------------------------")
-
-	// decoding the returned body data
-	err = json.Unmarshal(body, &httpResponse)
-
-	if err != nil {
-		log.Fatalln("Error while decoding the http response body", err)
-
-		return httpResponse, statusCode, err
-	}
-
-	// retrieve the statusCode data
-	statusCode = resp.StatusCode
-
-
-
-
-	var bb []byte
-	if resp.Body != nil {
-		defer resp.Body.Close()
-		var errr error
-		bb, errr = ioutil.ReadAll(resp.Body)
-		if errr != nil {
-			return nil, errr
-		}
-		r.Body = string(bb)
-
-		bodyJSONArray := []interface{}{}
-		if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
-			bodyJSONMap := map[string]interface{}{}
-			if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
-				r.BodyJSON = bodyJSONMap
-			}
-		} else {
-			r.BodyJSON = bodyJSONArray
-		}
-	}
-
-	r.StatusCode = resp.StatusCode
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	log.Println("Http call work fine")
-
-	return httpResponse, statusCode, nil
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-func (w Worker) CallHttp(task Task, step Step) (httpResponse HttpResponse, statusCode int, err error) {
-
-	// initialize the http client
-	httpclient := http.Client{}
-
-    // body informations
-	body := &bytes.Buffer{}
-
-    //
-
-	// http call data
-	var dataOut = HttpOut{
-		Name:      task.Name,
-		Arguments: task.Arguments,
-		Buffer:    task.Buffer}
-
-
-    // output data send to the API
-    var output = map[string]interface{}{
-        "id": task.ID,
-        "context": task.Context,
-        "arguments": task.Arguments,
-        "buffer": task.Buffer,
+    // initialize the HTTP transport
+    transport := &http.Transport{
+        TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
     }
 
+	// initialize the HTTP client
+    httpclient := http.Client{Transport: transport}
 
+	// parameter sends to the destination API into the request body
+	var output = models.ApiParameter{
+        ID:         task.ID,
+        Context:    task.Context,
+        Arguments:  task.Arguments,
+        Buffer:     task.Buffer,
+    }
 
 	// encode the body data for the call
-	jsonBody, err := json.Marshal(output)
+	outputJson, err := json.Marshal(output)
 	if err != nil {
         return nil, err
 	}
 
-
-
-
-	// create the http request
-	req, err := http.NewRequest("POST", step.Url, bytes.NewBuffer(jsonValue))
-
+	// create the HTTP request
+	request, err := http.NewRequest( endpoint.Method, endpoint.URL, bytes.NewBuffer(outputJson) )
 	if err != nil {
-		log.Fatalln("Error while create the http resquest", err)
-
-		return httpResponse, statusCode, err
+        return nil, err
 	}
 
+    // set some headers
+    request.Header.Set("Content-Type", "application/json")
+    //for k, v := range t.Headers {
+    //	req.Header.Set(k, v)
+    //}
 
-	body := &bytes.Buffer{}
-
-	if e.Body != "" {
-		body = bytes.NewBuffer([]byte(e.Body))
-	}
-
-	req, err := http.NewRequest(method, path, body)
-	if err != nil {
-		return nil, err
-	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-	// set some headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Custom-Header", "my-custom-header")
-
-
-	if len(e.BasicAuthUser) > 0 || len(e.BasicAuthPassword) > 0 {
-	    req.SetBasicAuth(e.BasicAuthUser, e.BasicAuthPassword)
-	}
-
-	for k, v := range t.Headers {
-		req.Header.Set(k, v)
-	}
-
-
-
-
-	// do the http call
-	resp, err := httpclient.Do(req)
-
-	if err != nil {
-		log.Fatalln("Error while do the http call", err)
-
-		return httpResponse, statusCode, err
-	}
-
-	defer resp.Body.Close()
-
-
-    tr := &http.Transport{
-        TLSClientConfig: &tls.Config{InsecureSkipVerify: t.IgnoreVerifySSL},
-    }
-    client := &http.Client{Transport: tr}
-
+    // timer
 	start := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+
+	// do the HTTP call
+	response, err := httpclient.Do(request)
+    if err != nil {
+        return nil, err
+    }
+
+    // elapsed timer
+	elapsed := time.Since(start).Seconds()
+
+
+
+
+    // check the API return
+    if response.Body == nil {
+        return nil, errors.New("The API doesn't return the good structure")
+    }
+
+    // XXX: need to check http status code
+    r.StatusCode = resp.StatusCode
+
+    // defer the closing of the body data
+	defer response.Body.Close()
+
+    // read the HTTP body
+    body, err := ioutil.ReadAll(response.Body)
+    if err != nil {
+        return nil, err
+    }
+
+    r.Body = string(bb)
+
+    bodyJSONArray := []interface{}{}
+    if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
+        bodyJSONMap := map[string]interface{}{}
+        if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
+            r.BodyJSON = bodyJSONMap
+        }
+    } else {
+        r.BodyJSON = bodyJSONArray
+    }
+
+
+    return response, nil
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Function to process the GOTO_LATER action
+func (worker *Worker) processActionGotoLater(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+	// interval settings
+	//
+
+	//default
+	var interval = 60
+
+	// interval is correctly defined ?
+	if response.Data.Interval != nil && *response.Data.Interval > 60 {
+		interval = *response.Data.Interval
 	}
-	elapsed := time.Since(start)
-	r.TimeSeconds = elapsed.Seconds()
-	r.TimeHuman = fmt.Sprintf("%s", elapsed)
 
+	// update the task TodoDate key
+	task.TodoDate = task.TodoDate.Add(time.Duration(interval) * time.Second)
 
+	// logger
+	log.Println("TodoDate updated to '%s'", task.TodoDate) // task.TodoDate.String()
 
+	// later == retry
+	task.Retry = task.Retry - 1
 
+	return worker.processGoto(task, definition, response)
+}
 
+// Function to process the GOTO action
+func (worker *Worker) processActionGoto(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
+	// step settings
+	//
 
-
-
-
-	// read the response body
-	body, err := ioutil.ReadAll(resp.Body)
-
-	if err != nil {
-		log.Fatalln("Error while read the http body data", err)
-
-		return httpResponse, statusCode, err
+	// step is defined ?
+	if response.Data.Step == nil || *response.Data.Step == "" {
+		return task, errors.New("Missing step parameter from API response for GOTO actions")
 	}
 
-	log.Println("===============================")
-	log.Printf("Post data request was '%s'\n", string(jsonValue))
-	log.Println("Response StatusCode:", resp.StatusCode)
-	log.Println("Response Headers:", resp.Header)
-	log.Println("Response Body:", string(body))
-	log.Println("-------------------------------")
+	// flag to know if found or not
+	var found = false
 
-	// decoding the returned body data
-	err = json.Unmarshal(body, &httpResponse)
-
-	if err != nil {
-		log.Fatalln("Error while decoding the http response body", err)
-
-		return httpResponse, statusCode, err
-	}
-
-	// retrieve the statusCode data
-	statusCode = resp.StatusCode
-
-
-
-
-	var bb []byte
-	if resp.Body != nil {
-		defer resp.Body.Close()
-		var errr error
-		bb, errr = ioutil.ReadAll(resp.Body)
-		if errr != nil {
-			return nil, errr
+	// asked step exists in the sequence
+	for _, s := range definition.Sequence {
+		// found the asked step
+		if s.Name == *response.Data.Step {
+			found = true
+			break
 		}
-		r.Body = string(bb)
+	}
 
-		bodyJSONArray := []interface{}{}
-		if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
-			bodyJSONMap := map[string]interface{}{}
-			if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
-				r.BodyJSON = bodyJSONMap
-			}
-		} else {
-			r.BodyJSON = bodyJSONArray
+	// not found, error
+	if !found {
+		return task, errors.New("Impossible to found the asked step from API response")
+	}
+
+	// setup the new step
+	task.Step = *response.Data.Step
+
+	// status T0D0
+	task.Status = models.TaskStatus_TODO
+
+	// logger
+	log.Println("Goto step updated to '%s'", task.Step)
+
+	return task, nil
+}
+
+// Function to process the NEXT_LATER action
+func (worker *Worker) processActionNextLater(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+	// interval settings default
+	var interval = 60
+
+	// interval is correctly defined ?
+	if response.Data.Interval != nil && *response.Data.Interval > 60 {
+		interval = *response.Data.Interval
+	}
+
+	// update the task TodoDate key
+	task.TodoDate = task.TodoDate.Add(time.Duration(interval) * time.Second)
+
+	// logger
+	log.Println("TodoDate updated to '%s'", task.TodoDate) // task.TodoDate.String()
+
+	// later == retry
+	task.Retry = task.Retry - 1
+
+	return worker.processNext(task, definition, response)
+}
+
+// Function to process the NEXT action
+func (worker *Worker) processActionNext(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+	// next step settings
+	//
+
+	// flag to know if actual step found or not
+	var found = false
+
+	// store the next step name
+	var nextStep string
+
+	// retrieve the next step data
+	for _, s := range definition.Sequence {
+		// actual founded, this one is the classic next step
+		if found {
+			// next step store
+			nextStep = s.Name
+			break
+		}
+		// this actual step was here, founded
+		if s.Name == task.Step {
+			found = true
 		}
 	}
 
-	r.StatusCode = resp.StatusCode
+	// no next step found, error
+	if !found {
+		return nil, errors.New("Impossible to found the next step")
+	}
 
+	// setup the new step
+	task.Step = nextStep
 
+	// status T0D0
+	task.Status = models.TaskStatus_TODO
 
+	// logger
+	log.Println("Next step updated to '%s'", task.Step)
 
+	return task, nil
+}
 
+// Function to process the RETRY_NOW action
+func (worker *Worker) processActionRetryNow(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
+	// status T0D0
+	task.Status = models.TaskStatus_TODO
 
+	task.Retry = task.Retry - 1
 
+	log.Println("Retry now this step")
 
+	return task, nil
+}
 
+// Function to process the RETRY action
+func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
+	// interval settings default
+	var interval = 60
 
+	// interval is correctly defined ?
+	if response.Data.Interval != nil && *response.Data.Interval > 60 {
+		interval = *response.Data.Interval
+	}
 
+	// update the task TodoDate key
+	task.TodoDate = task.TodoDate.Add(time.Duration(interval) * time.Second)
 
+	// no_decrement settings
+	//
 
+	// not exists/defined no_decrement flag
+	if response.Data.NoDecrement == nil || *response.Data.NoDecrement != true {
+		// later == retry
+		task.Retry = task.Retry - 1
+	}
 
+	// status T0D0
+	task.Status = models.TaskStatus_TODO
 
+	// logger
+	log.Println("Retry at the todoDate '%s'", task.TodoDate) // task.TodoDate.String()
 
+	return task, nil
+}
 
+// Function to process the PROBLEM action
+func (worker *Worker) processActionProblem(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
+	//      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
+	//      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
 
+	return nil, nil
+}
 
+// Function to process the ERROR action
+func (worker *Worker) processActionError(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
 
-	log.Println("Http call work fine")
+	//      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
+	//      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
 
-	return httpResponse, statusCode, nil
+	return nil, nil
+}
+
+// Function to process the CANCELED action
+func (worker *Worker) processActionCanceled(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+
+	//      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
+	//      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
+
+	return nil, nil
 }
