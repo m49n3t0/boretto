@@ -1,68 +1,81 @@
 package bot
 
 import (
-	"errors"
-	"github.com/m49n3t0/boretto/machine/models"
-	"strconv"
 	"bytes"
+	"errors"
 	_ "github.com/lib/pq"
+	"github.com/m49n3t0/boretto/machine/models"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	//	"encoding/json"
 	//	"gopkg.in/gorp.v2"
 	//	"strconv"
 	//	"time"
 
-    log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
 
 // the worker executes the task process
 type Worker struct {
-	workerPool  chan chan int64
-	taskChannel chan int64
-	dispatcher  *Dispatcher
-	quit        chan bool
+	// ID of the local worker
+	ID int64
+	// Pool of worker to notify our free time
+	Pool chan chan string
+	// Channel of the task IDs
+	Channel chan string
+	// Parent dispatcher
+	Dispatcher *Dispatcher
+	// Quit chan
+	Quit chan bool
 }
 
 // worker creation handler
-func NewWorker(dispatcher *Dispatcher) Worker {
+func NewWorker(ID *int64, dispatcher *Dispatcher) Worker {
 	return Worker{
-		workerPool:  dispatcher.workerPool,
-		taskChannel: make(chan int64),
-		dispatcher:  dispatcher,
-		quit:        make(chan bool)}
+		ID:         ID,
+		Pool:       dispatcher.workerPool,
+		Channel:    make(chan string),
+		Dispatcher: dispatcher,
+		Quit:       make(chan bool),
+	}
 }
 
 // start method starts the run loop for the worker
 // listening for a quit channel in case we need to stop it
 func (worker *Worker) Start() {
 	go func() {
+
+		// function logger
+		log := worker.Dispatcher.Logger
+
+		// infinite loop
 		for {
 
 			// register the current worker into the worker queue
-			worker.workerPool <- worker.taskChannel
+			worker.Pool <- worker.Channel
 
 			// read from the channel
 			select {
 
-                case taskId := <-worker.taskChannel:
+			case ID := <-worker.Channel:
 
-                    log.Printf("Entry to taskChannel with ID : '%d'\n", strconv.Itoa(int(taskId)))
+				log.Info("Worker '%d' works on task ID '%d'", worker.ID, ID)
 
-                    // we have received a work request
-                    if err := worker.DoAction(taskId); err != nil {
-                        log.Printf("Error while working on task: %s", err.Error())
-                    }
+				// we have received a work request
+				if err := worker.DoAction(ID); err != nil {
+					log.Printf("Error while working on task: %s", err.Error())
+				}
 
-                    log.Println(".", "ENDJOB")
+			case <-worker.Quit:
 
-                case <-worker.quit:
+				log.Info("Worker '%d' quits", worker.ID)
 
-                    // we have received a signal to stop
-                    // exit this function
-                    return
+				// we have received a signal to stop
+				// exit this function
+				return
 			}
 		}
 	}()
@@ -71,7 +84,7 @@ func (worker *Worker) Start() {
 // stop signals the worker to stop listening for work requests.
 func (worker *Worker) Stop() {
 	go func() {
-		worker.quit <- true
+		worker.Quit <- true
 	}()
 }
 
@@ -96,16 +109,21 @@ func (worker *Worker) Stop() {
 //
 
 // do the action for this task with the good action
-func (worker *Worker) DoAction(id int64) error {
+func (worker *Worker) DoAction(ID int64) error {
 
 	// retrieve a task
-	task, err := worker.dispatcher.getTask(id)
+	task, err := worker.Dispatcher.GetTask(ID)
 	if err != nil {
-		log.Fatalln("Error while fetching one task", err)
+		return err
 	}
 
+	// function logger
+	log := worker.Dispatcher.Logger.
+		WithField("task_id", ID).
+		WithField("worker", worker.ID)
+
 	// logger
-	log.Printf("Working on task '%d-%s' on step: '%s'\n", strconv.Itoa(int(task.Id)), task.Function, task.Step)
+	log.Info("Working with task '%d' on step '%s'", task.ID, task.Step)
 
 	// --------------------------------------------------------------------- //
 
@@ -144,102 +162,102 @@ func (worker *Worker) DoAction(id int64) error {
 	// change the task data
 	task.Status = models.TaskStatus_DOING
 
-    // update the task informations
-    err := worker.updateTask(task, nil)
-    if err != nil {
-        return err
-    }
+	// update the task informations
+	err := worker.updateTask(task, nil)
+	if err != nil {
+		return err
+	}
 
-    log.Println("Task in 'DOING' status")
+	log.Println("Task in 'DOING' status")
 
 	// --------------------------------------------------------------------- //
 
-    // do the http calls
-	err = worker.HttpCall( task, endpoint )
+	// do the http calls
+	err = worker.HttpCall(task, endpoint)
 	if err != nil {
-        return worker.updateTask( task, err )
+		return worker.updateTask(task, err)
 	}
 
 	// --------------------------------------------------------------------- //
 
-    // vars for process function response
-    var task *models.Task
-    var mErr error
+	// vars for process function response
+	var task *models.Task
+	var mErr error
 
-    // update the local buffer from the API return
-    if response.Buffer != nil {
-        task.Buffer = *response.Buffer
-    }
+	// update the local buffer from the API return
+	if response.Buffer != nil {
+		task.Buffer = *response.Buffer
+	}
 
-    // do the action correctly
-    switch response.Action {
+	// do the action correctly
+	switch response.Action {
 
-        // GOTO action
-        case models.EndpointResponseAction_GOTO:
-            task, mErr = worker.processActionGoto( task, definition, response)
+	// GOTO action
+	case models.EndpointResponseAction_GOTO:
+		task, mErr = worker.processActionGoto(task, definition, response)
 
-        // GOTO_LATER action
-        case models.EndpointResponseAction_GOTO_LATER :
-            task, mErr = worker.processActionGotoLater( task, definition, response)
+	// GOTO_LATER action
+	case models.EndpointResponseAction_GOTO_LATER:
+		task, mErr = worker.processActionGotoLater(task, definition, response)
 
-        // NEXT action
-        case models.EndpointResponseAction_NEXT :
-            task, mErr = worker.processActionNext( task, definition, response)
+	// NEXT action
+	case models.EndpointResponseAction_NEXT:
+		task, mErr = worker.processActionNext(task, definition, response)
 
-        // NEXT_LATER action
-        case models.EndpointResponseAction_NEXT_LATER :
-            task, mErr = worker.processActionNextLater( task, definition, response)
+	// NEXT_LATER action
+	case models.EndpointResponseAction_NEXT_LATER:
+		task, mErr = worker.processActionNextLater(task, definition, response)
 
-        // RETRY_NOW action
-        case models.EndpointResponseAction_RETRY_NOW :
-            task, mErr = worker.processActionRetryNow( task, definition, response)
+	// RETRY_NOW action
+	case models.EndpointResponseAction_RETRY_NOW:
+		task, mErr = worker.processActionRetryNow(task, definition, response)
 
-        // RETRY action
-        case models.EndpointResponseAction_RETRY :
-            task, mErr = worker.processActionRetry( task, definition, response)
+	// RETRY action
+	case models.EndpointResponseAction_RETRY:
+		task, mErr = worker.processActionRetry(task, definition, response)
 
-        // CANCELED action
-        case models.EndpointResponseAction_CANCELED :
-            task, mErr = worker.processActionCanceled( task, definition, response)
+	// CANCELED action
+	case models.EndpointResponseAction_CANCELED:
+		task, mErr = worker.processActionCanceled(task, definition, response)
 
-        // PROBLEM action
-        case models.EndpointResponseAction_PROBLEM:
-            task, mErr = worker.processActionProblem( task, definition, response)
+	// PROBLEM action
+	case models.EndpointResponseAction_PROBLEM:
+		task, mErr = worker.processActionProblem(task, definition, response)
 
-        // ERROR action
-        case models.EndpointResponseAction_ERROR:
-            task, mErr = worker.processActionError( task, definition, response)
+	// ERROR action
+	case models.EndpointResponseAction_ERROR:
+		task, mErr = worker.processActionError(task, definition, response)
 
-        // action not matched
-        default :
-            mErr = errors.New("Action '%s' isn't matched by executor process", response.Action)
-    }
+	// action not matched
+	default:
+		mErr = errors.New("Action '%s' isn't matched by executor process", response.Action)
+	}
 
-    return worker.updateTask( task, mErr )
+	return worker.updateTask(task, mErr)
 }
 
 func (worker *Worker) updateTask(task *models.Task, mErr error) error {
 
-    // if callback is an error, mistaken the task
-    if mErr != nil {
+	// if callback is an error, mistaken the task
+	if mErr != nil {
 
-        // status MISTAKE
-        task.Status = models.TaskStatus_MISTAKE
+		// status MISTAKE
+		task.Status = models.TaskStatus_MISTAKE
 
-        // get the comment from error message
-        task.Comment = mErr.Error()
+		// get the comment from error message
+		task.Comment = mErr.Error()
 
-        // always lss a retry when we do an error inside
-        task.Retry = task.Retry - 1
+		// always lss a retry when we do an error inside
+		task.Retry = task.Retry - 1
 
-        log.Printf("Mistake appear : '%s'", mErr)
-    }
+		log.Printf("Mistake appear : '%s'", mErr)
+	}
 
-    // always update the last update date key
+	// always update the last update date key
 	task.LastUpdate = time.Now()
 
 	// update the database object
-    err := dispatcher.db.Update(task)
+	err := dispatcher.db.Update(task)
 	if err != nil {
 		log.Printf("Error while updating the task result : %s", err)
 		return err
@@ -252,97 +270,84 @@ func (worker *Worker) updateTask(task *models.Task, mErr error) error {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-
-
-
-
-
-
-
-
-
 func (worker Worker) CallHttp(task *models.Task, endpoint *models.Endpoint) (*models.ApiResponse, error) {
 
-    // initialize the HTTP transport
-    transport := &http.Transport{
-        TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-    }
+	// initialize the HTTP transport
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
 
 	// initialize the HTTP client
-    httpclient := http.Client{Transport: transport}
+	httpclient := http.Client{Transport: transport}
 
 	// parameter sends to the destination API into the request body
 	var output = models.ApiParameter{
-        ID:         task.ID,
-        Context:    task.Context,
-        Arguments:  task.Arguments,
-        Buffer:     task.Buffer,
-    }
+		ID:        task.ID,
+		Context:   task.Context,
+		Arguments: task.Arguments,
+		Buffer:    task.Buffer,
+	}
 
 	// encode the body data for the call
 	outputJson, err := json.Marshal(output)
 	if err != nil {
-        return nil, err
+		return nil, err
 	}
 
 	// create the HTTP request
-	request, err := http.NewRequest( endpoint.Method, endpoint.URL, bytes.NewBuffer(outputJson) )
+	request, err := http.NewRequest(endpoint.Method, endpoint.URL, bytes.NewBuffer(outputJson))
 	if err != nil {
-        return nil, err
+		return nil, err
 	}
 
-    // set some headers
-    request.Header.Set("Content-Type", "application/json")
-    //for k, v := range t.Headers {
-    //	req.Header.Set(k, v)
-    //}
+	// set some headers
+	request.Header.Set("Content-Type", "application/json")
+	//for k, v := range t.Headers {
+	//	req.Header.Set(k, v)
+	//}
 
-    // timer
+	// timer
 	start := time.Now()
 
 	// do the HTTP call
 	response, err := httpclient.Do(request)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    // elapsed timer
+	// elapsed timer
 	elapsed := time.Since(start).Seconds()
 
+	// check the API return
+	if response.Body == nil {
+		return nil, errors.New("The API doesn't return the good structure")
+	}
 
+	// XXX: need to check http status code
+	r.StatusCode = resp.StatusCode
 
-
-    // check the API return
-    if response.Body == nil {
-        return nil, errors.New("The API doesn't return the good structure")
-    }
-
-    // XXX: need to check http status code
-    r.StatusCode = resp.StatusCode
-
-    // defer the closing of the body data
+	// defer the closing of the body data
 	defer response.Body.Close()
 
-    // read the HTTP body
-    body, err := ioutil.ReadAll(response.Body)
-    if err != nil {
-        return nil, err
-    }
+	// read the HTTP body
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
 
-    r.Body = string(bb)
+	r.Body = string(bb)
 
-    bodyJSONArray := []interface{}{}
-    if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
-        bodyJSONMap := map[string]interface{}{}
-        if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
-            r.BodyJSON = bodyJSONMap
-        }
-    } else {
-        r.BodyJSON = bodyJSONArray
-    }
+	bodyJSONArray := []interface{}{}
+	if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
+		bodyJSONMap := map[string]interface{}{}
+		if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
+			r.BodyJSON = bodyJSONMap
+		}
+	} else {
+		r.BodyJSON = bodyJSONArray
+	}
 
-
-    return response, nil
+	return response, nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////
