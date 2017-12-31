@@ -1,12 +1,7 @@
 package models
 
-import (
-	"database/sql/driver"
-	"fmt"
-)
-
 type ApiParameter struct {
-	ID        int64  `json:"id"`
+	ID        string `json:"id"`
 	Context   string `json:"context"`
 	Arguments JsonB  `json:"arguments"`
 	Buffer    JsonB  `json:"buffer"`

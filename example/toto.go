@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/m49n3t0/boretto/bot"
+	"github.com/m49n3t0/boretto/machine"
 	"log"
 )
 
@@ -10,13 +10,7 @@ func main() {
 
 	log.Println("Begin")
 
-    exec, err := bot.New()
-
-    if err != nil {
-        panic( err )
-    }
-
-    exec.Run()
+    machine.RunDefault("toto")
 
 	log.Println("Done")
 }

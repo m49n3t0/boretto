@@ -1,17 +1,9 @@
 package machine
 
 import (
-	"encoding/json"
-	"errors"
 	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
-	"time"
 
 	"github.com/go-pg/pg"
-	"github.com/m49n3t0/boretto/models"
-	"github.com/namsral/flag"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +12,7 @@ import (
 // interface to implements to correctly works with this executor
 type Machine interface {
 	// permit to retrieve logger handler
-	GetLogger() (*logrus.Entry, error)
+	GetLogger() (*logrus.Logger, error)
 	// permit to retrieve database handler
 	GetDatabase(*logrus.Entry) (*pg.DB, error)
 }
@@ -31,22 +23,22 @@ type Machine interface {
 type DefaultMachine struct{}
 
 // permit to retrieve logger handler
-func (machine *DefaultMachine) GetLogger() (*logrus.Entry, error) {
+func (machine DefaultMachine) GetLogger() (*logrus.Logger, error) {
 
 	// create a default logger
 	var logger = logrus.New()
 
 	// define the logger default level
-	log.Level = logrus.DebugLevel
+	logger.Level = logrus.DebugLevel
 
 	// define the logger default output
-	log.Out = os.Stdout
+	logger.Out = os.Stdout
 
 	return logger, nil
 }
 
 // permit to retrieve database handler
-func (machine *DefaultMachine) GetDatabase(logger *logrus.Entry) (*pg.DB, error) {
+func (machine DefaultMachine) GetDatabase(logger *logrus.Entry) (*pg.DB, error) {
 
 	// database configuration
 	host := os.Getenv("DB_HOST")
@@ -85,11 +77,11 @@ func (machine *DefaultMachine) GetDatabase(logger *logrus.Entry) (*pg.DB, error)
 
 // to launch the machine executor with a default struct
 func RunDefault(function string) {
-	return Run(DefaultMachine{}, function)
+	Run(DefaultMachine{}, function)
 }
 
 // to launch the machine executor
-func Run(machine *Machine, function string) {
+func Run(machine Machine, function string) {
 
 	// check mandatory parameter
 	if machine != nil {
@@ -134,7 +126,7 @@ func Run(machine *Machine, function string) {
 	for i := int64(0); i < dispatcher.MaxWorker; i++ {
 
 		// create a new worker
-		worker := NewWorker(&i, dispatcher)
+		worker := NewWorker(i, dispatcher)
 
 		// start it
 		worker.Start()

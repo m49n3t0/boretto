@@ -1,13 +1,10 @@
 package machine
 
 import (
-	"encoding/json"
 	"errors"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
-	"time"
 
 	"github.com/go-pg/pg"
 	"github.com/m49n3t0/boretto/models"
@@ -24,7 +21,7 @@ type DispatcherParams struct {
 	MaxWorker int64
 	MaxQueue  int64
 	// machine interface object
-	Machine *Machine
+	Machine Machine
 }
 
 // dispatcher object
@@ -37,9 +34,11 @@ type Dispatcher struct {
 	// manage the distribution of workflow
 	WorkerPool chan chan string
 	Queue      chan string
+	MaxWorker  int64
+	MaxQueue   int64
 	// manage the quit process
-	Signal chan os.Signal
-	Quit   chan bool
+	Signals chan os.Signal
+	Quit    chan bool
 	// database handler
 	DB *pg.DB
 	// logger handler
@@ -61,8 +60,11 @@ func NewDispatcher(params *DispatcherParams) (*Dispatcher, error) {
 		return nil, errors.New("the logger initialization return an empty object")
 	}
 
+	// encapsulate function field
+	logentry := logger.WithField("function", params.Function)
+
 	// get the database handler from interface
-	database, err := machine.GetDatabase(logger)
+	database, err := machine.GetDatabase(logentry)
 	if err != nil {
 		return nil, err
 	}
@@ -74,10 +76,12 @@ func NewDispatcher(params *DispatcherParams) (*Dispatcher, error) {
 		Endpoints:   make(map[string]*models.Endpoint),
 		WorkerPool:  make(chan chan string, params.MaxWorker),
 		Queue:       make(chan string, params.MaxQueue),
-		Signal:      make(chan os.Signal, 2),
+		MaxWorker:   params.MaxWorker,
+		MaxQueue:    params.MaxQueue,
+		Signals:     make(chan os.Signal, 2),
 		Quit:        make(chan bool),
 		DB:          database,
-		Logger:      logger.WithField("function", params.Function),
+		Logger:      logentry,
 	}
 
 	return dispatcher, nil
@@ -95,10 +99,10 @@ func (dispatcher *Dispatcher) Signal() {
 	go func() {
 
 		// link system signal to the dispatcher signal
-		signal.Notify(dispatcher.Signal, os.Interrupt, syscall.SIGTERM)
+		signal.Notify(dispatcher.Signals, os.Interrupt, syscall.SIGTERM)
 
 		// when receive syscall signal
-		<-dispatcher.Signal
+		<-dispatcher.Signals
 
 		// do a stopper
 		dispatcher.Stop()
@@ -154,7 +158,7 @@ func (dispatcher *Dispatcher) GetRobotConfiguration() error {
 	var endpoints []*models.Endpoint
 
 	// get the endpoint data
-	err := dispatcher.DB.
+	err = dispatcher.DB.
 		Model(&endpoints).
 		Where(models.TblEndpoint_ID+" IN ( ? )", pg.In(stepIDs)).
 		Select()
@@ -166,7 +170,7 @@ func (dispatcher *Dispatcher) GetRobotConfiguration() error {
 
 	// store locally each endpoints
 	for _, endpoint := range endpoints {
-		dispatcher.Endpoints[endpoint.ID] = &endpoint
+		dispatcher.Endpoints[endpoint.ID] = endpoint
 	}
 
 	log.Info("Robot configuration loaded")
@@ -210,6 +214,33 @@ func (dispatcher *Dispatcher) GetTasks() error {
 	}
 
 	return nil
+}
+
+// retrieve one task by ID
+func (dispatcher *Dispatcher) GetTask(ID string) (*models.Task, error) {
+
+	// store the data
+	var task models.Task
+
+	// fetch the object
+	err := dispatcher.DB.
+		Model(&task).
+		Where(models.TblTask_ID+" = ?", ID).
+		Where(models.TblTask_Status+" = ?", "TODO").
+		Where(models.TblTask_Function+" = ?", dispatcher.Function).
+		Where(models.TblTask_Retry+" > ?", 0).
+		Where(models.TblTask_TodoDate + " <= NOW()").
+		First()
+
+	if err != nil {
+		if err == pg.ErrNoRows {
+			return nil, errors.New("Task not found")
+		}
+
+		return nil, err
+	}
+
+	return &task, nil
 }
 
 //// listen the database event channel to do some actions
@@ -277,35 +308,4 @@ func (dispatcher *Dispatcher) GetTasks() error {
 //                go dispatcher.getTaskIDs()
 //		}
 //	}
-//}
-
-//// retrieve a task by ID
-//func (dispatcher *Dispatcher) getTask(id int64) (*models.Task, error) {
-//
-//	log.Println("Read task")
-//
-//	// model to fetch
-//	var task models.Task
-//
-//	// fetch the object
-//	err := dispatcher.db.
-//		Model(&task).
-//		Where(models.TblTask_Id+" = ?", id).
-//		Where(models.TblTask_Status+" = ?", "TODO").
-//		Where(models.TblTask_Function+" = ?", dispatcher.function).
-//		Where(models.TblTask_Retry+" > ?", 0).
-//		Where(models.TblTask_TodoDate + " <= NOW()").
-//		First()
-//
-//	if err != nil {
-//		if err == pg.ErrNoRows {
-//			log.Println("Task not found")
-//			return nil, errors.New("Task not found")
-//		}
-//
-//		log.Println("Error while retrieve a task")
-//		return nil, err
-//	}
-//
-//	return &task, nil
 //}

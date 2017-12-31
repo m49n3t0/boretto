@@ -1,17 +1,15 @@
-package bot
+package machine
 
 import (
 	"bytes"
+	"crypto/tls"
+	"encoding/json"
 	"errors"
-	_ "github.com/lib/pq"
-	"github.com/m49n3t0/boretto/machine/models"
+	"fmt"
+	"github.com/m49n3t0/boretto/models"
 	"io/ioutil"
 	"net/http"
-	"strconv"
-	//	"encoding/json"
-	//	"gopkg.in/gorp.v2"
-	//	"strconv"
-	//	"time"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -33,10 +31,10 @@ type Worker struct {
 }
 
 // worker creation handler
-func NewWorker(ID *int64, dispatcher *Dispatcher) Worker {
+func NewWorker(ID int64, dispatcher *Dispatcher) Worker {
 	return Worker{
 		ID:         ID,
-		Pool:       dispatcher.workerPool,
+		Pool:       dispatcher.WorkerPool,
 		Channel:    make(chan string),
 		Dispatcher: dispatcher,
 		Quit:       make(chan bool),
@@ -91,10 +89,10 @@ func (worker *Worker) Stop() {
 ///////////////////////////////////////////////////////////////////////////////
 
 //
-//  type EndpointResponse struct {
-//      Action  EndpointResponseAction  `json:"action,notnull"`
+//  type ApiResponse struct {
+//      Action  ApiResponseAction  `json:"action,notnull"`
 //      Buffer  *JsonB                  `json:"buffer"`
-//      Data    *EndpointResponseData   `json:"data"`
+//      Data    *ApiResponseData   `json:"data"`
 //  }
 //
 //  buffer: interface{},
@@ -109,7 +107,7 @@ func (worker *Worker) Stop() {
 //
 
 // do the action for this task with the good action
-func (worker *Worker) DoAction(ID int64) error {
+func (worker *Worker) DoAction(ID string) error {
 
 	// retrieve a task
 	task, err := worker.Dispatcher.GetTask(ID)
@@ -128,7 +126,7 @@ func (worker *Worker) DoAction(ID int64) error {
 	// --------------------------------------------------------------------- //
 
 	// get robot for this task version
-	definition, ok := worker.dispatcher.definitions[task.Version]
+	definition, ok := worker.Dispatcher.Definitions[task.Version]
 	if !ok {
 		return errors.New("Robot definition for this version doesn't exists")
 	}
@@ -152,7 +150,7 @@ func (worker *Worker) DoAction(ID int64) error {
 	}
 
 	// get the associated endpoint
-	endpoint, ok := worker.dispatcher.endpoints[step.EndpointID]
+	endpoint, ok := worker.Dispatcher.Endpoints[step.EndpointID]
 	if !ok {
 		return errors.New("Associated endpoint to this step doesn't exists")
 	}
@@ -163,7 +161,7 @@ func (worker *Worker) DoAction(ID int64) error {
 	task.Status = models.TaskStatus_DOING
 
 	// update the task informations
-	err := worker.updateTask(task, nil)
+	err = worker.updateTask(task, nil)
 	if err != nil {
 		return err
 	}
@@ -173,7 +171,7 @@ func (worker *Worker) DoAction(ID int64) error {
 	// --------------------------------------------------------------------- //
 
 	// do the http calls
-	err = worker.HttpCall(task, endpoint)
+	response, err := worker.CallHttp(task, endpoint)
 	if err != nil {
 		return worker.updateTask(task, err)
 	}
@@ -181,7 +179,6 @@ func (worker *Worker) DoAction(ID int64) error {
 	// --------------------------------------------------------------------- //
 
 	// vars for process function response
-	var task *models.Task
 	var mErr error
 
 	// update the local buffer from the API return
@@ -193,44 +190,44 @@ func (worker *Worker) DoAction(ID int64) error {
 	switch response.Action {
 
 	// GOTO action
-	case models.EndpointResponseAction_GOTO:
+	case models.Action_GOTO:
 		task, mErr = worker.processActionGoto(task, definition, response)
 
 	// GOTO_LATER action
-	case models.EndpointResponseAction_GOTO_LATER:
+	case models.Action_GOTO_LATER:
 		task, mErr = worker.processActionGotoLater(task, definition, response)
 
 	// NEXT action
-	case models.EndpointResponseAction_NEXT:
+	case models.Action_NEXT:
 		task, mErr = worker.processActionNext(task, definition, response)
 
 	// NEXT_LATER action
-	case models.EndpointResponseAction_NEXT_LATER:
+	case models.Action_NEXT_LATER:
 		task, mErr = worker.processActionNextLater(task, definition, response)
 
 	// RETRY_NOW action
-	case models.EndpointResponseAction_RETRY_NOW:
+	case models.Action_RETRY_NOW:
 		task, mErr = worker.processActionRetryNow(task, definition, response)
 
 	// RETRY action
-	case models.EndpointResponseAction_RETRY:
+	case models.Action_RETRY:
 		task, mErr = worker.processActionRetry(task, definition, response)
 
 	// CANCELED action
-	case models.EndpointResponseAction_CANCELED:
+	case models.Action_CANCELED:
 		task, mErr = worker.processActionCanceled(task, definition, response)
 
 	// PROBLEM action
-	case models.EndpointResponseAction_PROBLEM:
+	case models.Action_PROBLEM:
 		task, mErr = worker.processActionProblem(task, definition, response)
 
 	// ERROR action
-	case models.EndpointResponseAction_ERROR:
+	case models.Action_ERROR:
 		task, mErr = worker.processActionError(task, definition, response)
 
 	// action not matched
 	default:
-		mErr = errors.New("Action '%s' isn't matched by executor process", response.Action)
+		mErr = fmt.Errorf("Action '%s' isn't matched by executor process", response.Action)
 	}
 
 	return worker.updateTask(task, mErr)
@@ -257,7 +254,7 @@ func (worker *Worker) updateTask(task *models.Task, mErr error) error {
 	task.LastUpdate = time.Now()
 
 	// update the database object
-	err := dispatcher.db.Update(task)
+	err := worker.Dispatcher.DB.Update(task)
 	if err != nil {
 		log.Printf("Error while updating the task result : %s", err)
 		return err
@@ -323,8 +320,8 @@ func (worker Worker) CallHttp(task *models.Task, endpoint *models.Endpoint) (*mo
 		return nil, errors.New("The API doesn't return the good structure")
 	}
 
-	// XXX: need to check http status code
-	r.StatusCode = resp.StatusCode
+	//	// XXX: need to check http status code
+	//	r.StatusCode = resp.StatusCode
 
 	// defer the closing of the body data
 	defer response.Body.Close()
@@ -335,31 +332,33 @@ func (worker Worker) CallHttp(task *models.Task, endpoint *models.Endpoint) (*mo
 		return nil, err
 	}
 
-	r.Body = string(bb)
+	//	r.Body = string(bb)
+	//
+	//	bodyJSONArray := []interface{}{}
+	//	if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
+	//		bodyJSONMap := map[string]interface{}{}
+	//		if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
+	//			r.BodyJSON = bodyJSONMap
+	//		}
+	//	} else {
+	//		r.BodyJSON = bodyJSONArray
+	//	}
+	fmt.Println(body)
+	fmt.Println(elapsed)
 
-	bodyJSONArray := []interface{}{}
-	if err := json.Unmarshal(bb, &bodyJSONArray); err != nil {
-		bodyJSONMap := map[string]interface{}{}
-		if err2 := json.Unmarshal(bb, &bodyJSONMap); err2 == nil {
-			r.BodyJSON = bodyJSONMap
-		}
-	} else {
-		r.BodyJSON = bodyJSONArray
-	}
-
-	return response, nil
+	return &models.ApiResponse{}, nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 // Function to process the GOTO_LATER action
-func (worker *Worker) processActionGotoLater(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionGotoLater(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	// interval settings
 	//
 
 	//default
-	var interval = 60
+	var interval int64 = 60
 
 	// interval is correctly defined ?
 	if response.Data.Interval != nil && *response.Data.Interval > 60 {
@@ -375,11 +374,11 @@ func (worker *Worker) processActionGotoLater(task *models.Task, definition *mode
 	// later == retry
 	task.Retry = task.Retry - 1
 
-	return worker.processGoto(task, definition, response)
+	return worker.processActionGoto(task, definition, response)
 }
 
 // Function to process the GOTO action
-func (worker *Worker) processActionGoto(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionGoto(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	// step settings
 	//
@@ -419,10 +418,10 @@ func (worker *Worker) processActionGoto(task *models.Task, definition *models.De
 }
 
 // Function to process the NEXT_LATER action
-func (worker *Worker) processActionNextLater(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionNextLater(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	// interval settings default
-	var interval = 60
+	var interval int64 = 60
 
 	// interval is correctly defined ?
 	if response.Data.Interval != nil && *response.Data.Interval > 60 {
@@ -438,11 +437,11 @@ func (worker *Worker) processActionNextLater(task *models.Task, definition *mode
 	// later == retry
 	task.Retry = task.Retry - 1
 
-	return worker.processNext(task, definition, response)
+	return worker.processActionNext(task, definition, response)
 }
 
 // Function to process the NEXT action
-func (worker *Worker) processActionNext(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionNext(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	// next step settings
 	//
@@ -485,7 +484,7 @@ func (worker *Worker) processActionNext(task *models.Task, definition *models.De
 }
 
 // Function to process the RETRY_NOW action
-func (worker *Worker) processActionRetryNow(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionRetryNow(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	// status T0D0
 	task.Status = models.TaskStatus_TODO
@@ -498,10 +497,10 @@ func (worker *Worker) processActionRetryNow(task *models.Task, definition *model
 }
 
 // Function to process the RETRY action
-func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionRetry(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	// interval settings default
-	var interval = 60
+	var interval int64 = 60
 
 	// interval is correctly defined ?
 	if response.Data.Interval != nil && *response.Data.Interval > 60 {
@@ -530,7 +529,7 @@ func (worker *Worker) processActionRetry(task *models.Task, definition *models.D
 }
 
 // Function to process the PROBLEM action
-func (worker *Worker) processActionProblem(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionProblem(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	//      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
 	//      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
@@ -539,7 +538,7 @@ func (worker *Worker) processActionProblem(task *models.Task, definition *models
 }
 
 // Function to process the ERROR action
-func (worker *Worker) processActionError(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionError(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	//      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
 	//      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
@@ -548,7 +547,7 @@ func (worker *Worker) processActionError(task *models.Task, definition *models.D
 }
 
 // Function to process the CANCELED action
-func (worker *Worker) processActionCanceled(task *models.Task, definition *models.Definition, response *models.EndpointResponse) (*models.Task, error) {
+func (worker *Worker) processActionCanceled(task *models.Task, definition *models.Definition, response *models.ApiResponse) (*models.Task, error) {
 
 	//      comment: string               --> optional : only for ERROR/PROBLEM/CANCELED action
 	//      detail: map[string]string{}   --> optional : only for ERROR/PROBLEM/CANCELED action for push with field in the logger
